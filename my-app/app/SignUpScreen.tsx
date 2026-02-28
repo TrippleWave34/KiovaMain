@@ -13,10 +13,26 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function LoginScreen() {
+export default function SignUpScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSignUp = () => {
+    if (!username || !password || !confirmPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    setError('');
+    router.replace('/(tabs)/HomeScreen');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -34,13 +50,15 @@ export default function LoginScreen() {
 
         <View style={styles.header}>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>✦ Welcome back</Text>
+            <Text style={styles.badgeText}>✦ Get started</Text>
           </View>
-          <Text style={styles.title}>Login to{'\n'}Kiova</Text>
-          <Text style={styles.subtitle}>Enter your credentials to continue</Text>
+          <Text style={styles.title}>Create your{'\n'}Account</Text>
+          <Text style={styles.subtitle}>Join Kiova and start styling</Text>
         </View>
 
         <View style={styles.form}>
+
+          {/* Username */}
           <View style={styles.inputWrapper}>
             <Ionicons name="person-outline" size={18} color="#888" style={styles.inputIcon} />
             <TextInput
@@ -48,12 +66,13 @@ export default function LoginScreen() {
               placeholder="Username"
               placeholderTextColor="#AAAAAA"
               value={username}
-              onChangeText={setUsername}
+              onChangeText={(text) => { setUsername(text); setError(''); }}
               autoCapitalize="none"
               autoCorrect={false}
             />
           </View>
 
+          {/* Password */}
           <View style={styles.inputWrapper}>
             <Ionicons name="lock-closed-outline" size={18} color="#888" style={styles.inputIcon} />
             <TextInput
@@ -61,7 +80,7 @@ export default function LoginScreen() {
               placeholder="Password"
               placeholderTextColor="#AAAAAA"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => { setPassword(text); setError(''); }}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
             />
@@ -70,22 +89,46 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.forgotWrapper}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
+          {/* Confirm Password */}
+          <View style={[
+            styles.inputWrapper,
+            confirmPassword && password !== confirmPassword && styles.inputError,
+          ]}>
+            <Ionicons name="lock-closed-outline" size={18} color="#888" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#AAAAAA"
+              value={confirmPassword}
+              onChangeText={(text) => { setConfirmPassword(text); setError(''); }}
+              secureTextEntry={!showConfirm}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
+              <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={18} color="#888" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Error message */}
+          {error ? (
+            <View style={styles.errorWrapper}>
+              <Ionicons name="alert-circle-outline" size={14} color="#FF3B30" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
+
+          {/* Sign up button */}
+          <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+            <Text style={styles.buttonText}>Create Account</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => router.replace('/(tabs)/HomeScreen')}
-          >
-            <Text style={styles.buttonText}>Login</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => router.replace('/SignUpScreen')}>
-            <Text style={styles.signupText}>
-              Don't have an account? <Text style={styles.signupLink}>Sign up</Text>
+          {/* Login link */}
+          <TouchableOpacity onPress={() => router.replace('/LoginScreen')}>
+            <Text style={styles.loginText}>
+              Already have an account? <Text style={styles.loginLink}>Login</Text>
             </Text>
           </TouchableOpacity>
+
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -124,16 +167,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.85)',
     borderRadius: 16, paddingHorizontal: 16, height: 56, gap: 10,
+    borderWidth: 1.5, borderColor: 'transparent',
+  },
+  inputError: {
+    borderColor: '#FF3B30',
   },
   inputIcon: { marginRight: 4 },
   input: { flex: 1, fontSize: 15, color: '#1A1A1A' },
-  forgotWrapper: { alignSelf: 'flex-end' },
-  forgotText: { fontSize: 13, color: '#6B4EFF', fontWeight: '600' },
+  errorWrapper: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: -4,
+  },
+  errorText: {
+    color: '#FF3B30', fontSize: 13, fontWeight: '600',
+  },
   button: {
     backgroundColor: '#1A1A1A', borderRadius: 50,
-    paddingVertical: 16, alignItems: 'center', marginTop: 8,
+    paddingVertical: 16, alignItems: 'center', marginTop: 4,
   },
   buttonText: { color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 0.5 },
-  signupText: { fontSize: 14, color: '#555', textAlign: 'center', marginTop: 4 },
-  signupLink: { color: '#FF5722', fontWeight: '700' },
+  loginText: { fontSize: 14, color: '#555', textAlign: 'center', marginTop: 4 },
+  loginLink: { color: '#FF5722', fontWeight: '700' },
 });

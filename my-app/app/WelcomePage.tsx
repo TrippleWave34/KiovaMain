@@ -58,7 +58,7 @@ export default function WelcomePage() {
 
         <TouchableOpacity
           style={styles.button}
-          onPress={() => router.replace('/(tabs)/HomeScreen')}
+          onPress={() => router.push('/SignUpScreen')}
         >
           <Text style={styles.buttonText}>Get Started</Text>
         </TouchableOpacity>
