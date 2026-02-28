@@ -54,7 +54,6 @@ export default function TabLayout() {
           ),
         }}
       />
-
     </Tabs>
   );
 }
@@ -65,7 +64,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 25,
     marginHorizontal: 20,
-    left: 20,
+    left: 30,
     right: 20,
     height: 65,
     borderRadius: 35,

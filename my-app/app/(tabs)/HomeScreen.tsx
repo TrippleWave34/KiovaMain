@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.6)',
   },
   previewBox: {
-    height: 220,
+    height: 460,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.6)',
     alignItems: 'center',
