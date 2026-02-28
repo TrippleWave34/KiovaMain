@@ -1,141 +1,173 @@
-import React, { useState, useRef } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   Image,
   StyleSheet,
-  FlatList,
-  Dimensions,
   TouchableOpacity,
-  ListRenderItem,
+  SafeAreaView,
+  StatusBar,
+  Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
 
-const { width } = Dimensions.get('window');
-
-type Slide = {
-  id: string;
-  images: any[];
-  title: string;
-};
-
-const slides: Slide[] = [
-  {
-    id: '1',
-    images: [
-      require('../assets/images/FormalImage.jpg'),
-      require('../assets/images/minimalistImage.jpg'),
-      require('../assets/images/streetwearImage.jpg'),
-    ],
-    title: 'Mix, Match & Style Like a Pro',
-  },
-];
+const { height } = Dimensions.get('window');
 
 export default function WelcomePage() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList<Slide>>(null);
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" />
 
-  const handleNext = () => {
-    if (currentIndex < slides.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
-    } else {
-      router.replace('/(tabs)/HomeScreen');
-    }
-  };
+      {/* Image collage — top half */}
+      <View style={styles.imageContainer}>
 
-  const renderSlide: ListRenderItem<Slide> = ({ item }) => (
-    <View style={[styles.slide, { width }]}>
-      <View style={styles.imageRow}>
-        <Image source={item.images[0]} style={styles.leftImage} />
+        {/* Left tall image — centered crop */}
+        <View style={styles.leftImageWrapper}>
+          <Image
+            source={require('../assets/images/FormalImage.jpg')}
+            style={styles.leftImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Right two stacked images */}
         <View style={styles.rightColumn}>
-          <Image source={item.images[1]} style={styles.rightTopImage} />
-          <Image source={item.images[2]} style={styles.rightBottomImage} />
+          <Image
+            source={require('../assets/images/minimalistImage.jpg')}
+            style={styles.rightTopImage}
+            resizeMode="cover"
+          />
+          <Image
+            source={require('../assets/images/streetwearImage.jpg')}
+            style={styles.rightBottomImage}
+            resizeMode="cover"
+          />
         </View>
       </View>
-      <Text style={styles.title}>{item.title}</Text>
-      <TouchableOpacity style={styles.button} onPress={handleNext}>
-        <Text style={styles.buttonText}>
-          {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push('/LoginScreen')}>
-        <Text style={styles.loginText}>
-          Already have an account? <Text style={styles.loginLink}>Login</Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
 
-  return (
-    <FlatList
-      ref={flatListRef}
-      data={slides}
-      keyExtractor={(item) => item.id}
-      horizontal
-      pagingEnabled
-      showsHorizontalScrollIndicator={false}
-      renderItem={renderSlide}
-      onMomentumScrollEnd={(event) => {
-        const index = Math.round(event.nativeEvent.contentOffset.x / width);
-        setCurrentIndex(index);
-      }}
-    />
+      {/* Bottom content */}
+      <View style={styles.content}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>✦ AI Powered</Text>
+        </View>
+
+        <Text style={styles.title}>Mix, Match &{'\n'}Style Like a Pro</Text>
+        <Text style={styles.subtitle}>
+          Build outfits from your wardrobe and preview them with AI — all in one place.
+        </Text>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.replace('/(tabs)/HomeScreen')}
+        >
+          <Text style={styles.buttonText}>Get Started</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/LoginScreen')}>
+          <Text style={styles.loginText}>
+            Already have an account?{' '}
+            <Text style={styles.loginLink}>Login</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  slide: {
+  safe: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: 40,
     backgroundColor: '#fff',
   },
-  imageRow: {
+  imageContainer: {
     flexDirection: 'row',
-    width: '90%',
-    height: 400,
-    marginBottom: 30,
+    height: height * 0.52,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 10,
+  },
+
+  // Left image centered — floats between the two right images
+  leftImageWrapper: {
+    flex: 1.5,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginVertical: 30,
   },
   leftImage: {
-    flex: 1.5,
-    borderRadius: 20,
-    marginRight: 10,
+    width: '100%',
+    height: '100%',
   },
+
+  // Right column
   rightColumn: {
     flex: 1,
-    justifyContent: 'space-between',
+    gap: 10,
   },
   rightTopImage: {
     flex: 1,
-    borderRadius: 20,
-    marginBottom: 10,
+    borderRadius: 24,
   },
   rightBottomImage: {
     flex: 1,
+    borderRadius: 24,
+  },
+
+  // Content
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    paddingBottom: 16,
+  },
+  badge: {
+    backgroundColor: '#F0EDFF',
     borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 16,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B4EFF',
+    letterSpacing: 1,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
+    color: '#1A1A1A',
+    lineHeight: 40,
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 28,
+    maxWidth: 280,
   },
   button: {
-    backgroundColor: '#000',
+    backgroundColor: '#1A1A1A',
     borderRadius: 50,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    marginBottom: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 60,
+    marginBottom: 16,
+    width: '100%',
+    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontWeight: '900',
+    fontWeight: '800',
     fontSize: 16,
+    letterSpacing: 0.5,
   },
   loginText: {
     fontSize: 14,
-    color: '#333',
+    color: '#555',
   },
   loginLink: {
     color: '#FF5722',
