@@ -54,33 +54,37 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="SavedPage"
-        options={{
-          tabBarIcon: ({ focused }: { focused: boolean }) => (
-            <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />
-          ),
-        }}
-      />
+
     </Tabs>
   );
 }
 
+
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 72,
+    bottom: 25,
+    marginHorizontal: 20,
+    left: 20,
+    right: 20,
+
+    height: 65,
+    borderRadius: 35,
+
     backgroundColor: '#1A1A1A',
     borderTopWidth: 0,
-    paddingBottom: 0,
+
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 15,
   },
   iconWrapper: {
-    width: 44,
+    width: 35,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 23,
   },
 });
