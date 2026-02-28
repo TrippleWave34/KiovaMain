@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 import firebase_admin
 from firebase_admin import credentials, auth
+from verify import get_current_user
 
 cred = credentials.Certificate("/Users/tivan/Desktop/hackathon/KiovaMain/backend/hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json")
 firebase_admin.initialize_app(cred)
@@ -61,4 +62,44 @@ def login_user(id_token: str):
 #TODO: implement token and bearer for protected routes
     
 #protected routes
-    
+"""
+/profile
+/wardrobe - return images
+/generate-outfit([] items)
+/
+"""
+
+"""
+ take the users linked image and generate it with the gemnai prompt
+
+ javascript for logging in:
+
+ import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+ async function login(email, password) {
+  const userCredential = await signInWithEmailAndPassword(
+    auth,
+    email,
+    password
+  );
+
+  const user = userCredential.user;
+
+  // 🔥 This is the UID
+  const uid = user.uid;
+
+  // 🔥 This is the JWT token
+  const idToken = await user.getIdToken();
+
+  return { uid, idToken };
+"""
