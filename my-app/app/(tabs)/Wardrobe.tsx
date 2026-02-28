@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,225 +6,220 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  SafeAreaView,
-  ScrollView,
   Dimensions,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons, Feather } from "@expo/vector-icons";
 
-const { width } = Dimensions.get('window');
-const CARD_SIZE = (width - 40) / 2;
+const { width } = Dimensions.get("window");
 
-const CATEGORIES = ['All', 'Tops', 'Bottoms', 'Outerwear', 'Dresses', 'Shoes'];
+const categories = ["All", "Tops", "Bottoms", "Outerwear"];
 
 type ClothingItem = {
   id: string;
-  uri: string;
+  image: string;
   category: string;
 };
 
-export default function Wardrobe() {
+export default function WardrobeScreen() {
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [items, setItems] = useState<ClothingItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [loading, setLoading] = useState(false);
 
-  const filtered =
-    selectedCategory === 'All'
-      ? items
-      : items.filter((item) => item.category === selectedCategory);
-
-  const pickImage = useCallback(async () => {
-    const { status } =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Allow gallery access.');
-      return;
-    }
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      allowsEditing: true, // cropping screen
+      aspect: [4, 5],
+      quality: 1,
     });
 
-    if (result.canceled) return;
+    if (!result.canceled) {
+      const newItem: ClothingItem = {
+        id: Date.now().toString(),
+        image: result.assets[0].uri,
+        category: "Tops", // placeholder autotag
+      };
 
-    const image = result.assets[0];
+      setItems((prev) => [...prev, newItem]);
+    }
+  };
 
-    Alert.alert('Select Category', '', [
-      ...CATEGORIES.filter((c) => c !== 'All').map((cat) => ({
-        text: cat,
-        onPress: () => {
-          const newItem = {
-            id: Date.now().toString(),
-            uri: image.uri,
-            category: cat,
-          };
-
-          setItems((prev) => [...prev, newItem]);
-        },
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, []);
-
-  const renderItem = ({ item }: { item: ClothingItem }) => (
-    <View style={styles.card}>
-      <Image source={{ uri: item.uri }} style={styles.image} />
-    </View>
-  );
+  const filteredItems =
+    selectedCategory === "All"
+      ? items
+      : items.filter((item) => item.category === selectedCategory);
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <LinearGradient
-        colors={['#F8F5FF', '#F9F2F5', '#F5F8FF']}
-        style={StyleSheet.absoluteFill}
-      />
+  <LinearGradient
+    colors={["#F5F3F0", "#F5F3F0"]}
+    style={styles.container}
+  >
+    {/* Top Header */}
+    <View style={styles.topBar}>
+      <Ionicons name="person-outline" size={26} color="black" />
+      <Text style={styles.logo}>Kiova</Text>
+      <Ionicons name="notifications-outline" size={26} color="black" />
+    </View>
 
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Your wardrobe</Text>
-          <Text style={styles.subtitle}>
-            Add items and organize your looks.
-          </Text>
-        </View>
+    {/* Title + Buttons */}
+    <View style={styles.headerSection}>
+      <Text style={styles.title}>Your wardrobe</Text>
 
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.savedBtn}>
-            <Ionicons name="bookmark" size={16} color="#fff" />
-            <Text style={styles.btnText}>Saved</Text>
-          </TouchableOpacity>
+      <View style={styles.headerButtons}>
+        <TouchableOpacity style={styles.blackButton}>
+          <Feather name="bookmark" size={18} color="white" />
+          <Text style={styles.blackButtonText}>Saved</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={pickImage}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="add" size={16} color="#fff" />
-                <Text style={styles.btnText}>Add</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
+          <Feather name="plus" size={18} color="white" />
+          <Text style={styles.blackButtonText}>Add</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* CATEGORY FILTER */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ marginTop: 10 }}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
-      >
-        {CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat}
+      <Text style={styles.subtitle}>
+        All your pieces live here. Add items, filter by category,
+        and build outfits faster.
+      </Text>
+    </View>
+
+    {/* Category Filters */}
+    <View style={styles.filterRow}>
+      {categories.map((cat) => (
+        <TouchableOpacity
+          key={cat}
+          onPress={() => setSelectedCategory(cat)}
+          style={[
+            styles.filterButton,
+            selectedCategory === cat && styles.activeFilter,
+          ]}
+        >
+          <Text
             style={[
-              styles.pill,
-              selectedCategory === cat && styles.activePill,
+              styles.filterText,
+              selectedCategory === cat && styles.activeFilterText,
             ]}
-            onPress={() => setSelectedCategory(cat)}
           >
-            <Text
-              style={[
-                styles.pillText,
-                selectedCategory === cat && { color: '#fff' },
-              ]}
-            >
-              {cat}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            {cat}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
 
-      {/* GRID */}
-      <FlatList
-        data={filtered}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={{ padding: 16 }}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
-      />
-    </SafeAreaView>
-  );
+    {/* Clothing Grid */}
+    <FlatList
+      data={filteredItems}
+      numColumns={2}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      renderItem={({ item }) => (
+        <View style={styles.card}>
+          <Image source={{ uri: item.image }} style={styles.image} />
+        </View>
+      )}
+    />
+  </LinearGradient>
+);
 }
-
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
+
+  topBar: {
+    marginTop: 60,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  logo: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#F4A261",
+  },
+
+  headerSection: {
+    marginTop: 30,
+  },
+
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111',
+    fontSize: 42,
+    fontWeight: "700",
+    color: "black",
   },
-  subtitle: {
-    fontSize: 13,
-    color: '#777',
-    marginTop: 4,
-  },
+
   headerButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
+    marginTop: 15,
     gap: 10,
-    alignItems: 'center',
   },
-  savedBtn: {
-    flexDirection: 'row',
-    backgroundColor: '#111',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignItems: 'center',
+
+  blackButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "black",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 30,
     gap: 6,
   },
-  addBtn: {
-    flexDirection: 'row',
-    backgroundColor: '#111',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignItems: 'center',
-    gap: 6,
+
+  blackButtonText: {
+    color: "white",
+    fontWeight: "600",
   },
-  btnText: {
-    color: '#fff',
-    fontWeight: '600',
+
+  subtitle: {
+    marginTop: 15,
+    color: "#555",
+    fontSize: 15,
+    lineHeight: 22,
   },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#EAEAEA',
-    borderRadius: 20,
-    marginRight: 8,
+
+  filterRow: {
+    flexDirection: "row",
+    marginTop: 25,
+    gap: 10,
   },
-  activePill: {
-    backgroundColor: '#111',
+
+  filterButton: {
+    backgroundColor: "#F1F1F1",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
   },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '500',
+
+  activeFilter: {
+    backgroundColor: "black",
   },
+
+  filterText: {
+    fontWeight: "600",
+  },
+
+  activeFilterText: {
+    color: "white",
+  },
+
   card: {
-    width: CARD_SIZE,
-    height: CARD_SIZE * 1.3,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#fff',
+    width: width / 2 - 30,
+    height: 200,
+    backgroundColor: "white",
+    borderRadius: 20,
+    margin: 10,
+    overflow: "hidden",
   },
+
   image: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
-});
+
+  },
+);
