@@ -7,11 +7,7 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
   return (
     <View style={styles.iconWrapper}>
-      <Ionicons
-        name={name}
-        size={22}
-        color={focused ? '#FFFFFF' : '#888888'}
-      />
+      <Ionicons name={name} size={22} color={focused ? '#FFFFFF' : '#888888'} />
     </View>
   );
 }
@@ -28,7 +24,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="HomeScreen"
         options={{
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused }: { focused: boolean }) => (
             <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} />
           ),
         }}
@@ -36,7 +32,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Wardrobe"
         options={{
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused }: { focused: boolean }) => (
             <TabIcon name={focused ? 'shirt' : 'shirt-outline'} focused={focused} />
           ),
         }}
@@ -44,7 +40,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="SavedOutfit"
         options={{
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused }: { focused: boolean }) => (
             <TabIcon name={focused ? 'heart' : 'heart-outline'} focused={focused} />
           ),
         }}
@@ -52,7 +48,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Settings"
         options={{
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused }: { focused: boolean }) => (
             <TabIcon name={focused ? 'settings' : 'settings-outline'} focused={focused} />
           ),
         }}
@@ -60,7 +56,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="SavedPage"
         options={{
-          tabBarIcon: ({ focused }) => (
+          tabBarIcon: ({ focused }: { focused: boolean }) => (
             <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} />
           ),
         }}
@@ -76,7 +72,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 72,
-    borderRadius: 0,
     backgroundColor: '#1A1A1A',
     borderTopWidth: 0,
     paddingBottom: 0,
