@@ -67,11 +67,6 @@ def register_user(request: RegisterRequest):
     
 #protected routes
 
-# take image 
-    
-
-
-
 #TODO: add feature to save to real DB 
 @app.post("/save-image")
 async def save_image(
@@ -103,54 +98,30 @@ async def save_image(
         }
 
 
-#profile page - return user images
+#wardrobe route to return all images for a user
+@app.get("/wardrobe")
+async def get_wardrobe(user=Depends(get_current_user)):
+    uid = user["uid"]
 
+    try:
+        images =list( fake_db.get(uid, []))
+        return {
+            "message": "Wardrobe retrieved",
+            "uid": uid,
+            "images": images
+        }
 
-# convert to binary
-# host it on url service
-# genarate image
-# return image url to user
-    
+    except Exception as e:
+        return {
+            "message": "Error retrieving wardrobe",
+            "error": str(e)
+        }
+
+#generate outfit route to return generated outfit based on user images and gemnai prompt
+@app.post("/generate-outfit")
+async def generate_outfit(user = Depends(get_current_user), items: list[str] = Form(...)):
+    uid = user["uid"]
+
+    return ""
+
 #TODO: get azure database connection
-"""
-/profile
-/wardrobe - return images
-/generate-outfit([] items)
-/upload
-/
-"""
-
-"""
- take the users linked image and generate it with the gemnai prompt
-
- javascript for logging in:
-
- import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
- async function login(email, password) {
-  const userCredential = await signInWithEmailAndPassword(
-    auth,
-    email,
-    password
-  );
-
-  const user = userCredential.user;
-
-  // 🔥 This is the UID
-  const uid = user.uid;
-
-  // 🔥 This is the JWT token
-  const idToken = await user.getIdToken();
-
-  return { uid, idToken };
-"""
