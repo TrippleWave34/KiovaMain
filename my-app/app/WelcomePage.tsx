@@ -1,4 +1,3 @@
-// WelcomeScreen.tsx
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -8,63 +7,42 @@ import {
   FlatList,
   Dimensions,
   TouchableOpacity,
-  ImageSourcePropType,
   ListRenderItem,
 } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { router } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
-// Define slide type
 type Slide = {
   id: string;
-  images: ImageSourcePropType[];
+  images: any[];
   title: string;
 };
 
-// Slides data
 const slides: Slide[] = [
   {
     id: '1',
     images: [
-      require('../../assets/images/FormalImage.jpg'),
-      require('../../assets/images/minimalistImage.jpg'),
-      require('../../assets/images/steetwearImage.jpg')
+      require('../assets/images/FormalImage.jpg'),
+      require('../assets/images/minimalistImage.jpg'),
+      require('../assets/images/streetwearImage.jpg'),
     ],
     title: 'Mix, Match & Style Like a Pro',
   },
 ];
 
-// Navigation types
-type RootStackParamList = {
-  Welcome: undefined;
-  Login: undefined;
-  App: undefined;
-};
-
-type WelcomeScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'Welcome'
->;
-
-interface Props {
-  navigation: WelcomeScreenNavigationProp;
-}
-
-const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
+export default function WelcomePage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList<Slide>>(null);
 
-  // Next button handler
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
     } else {
-      navigation.replace('App');
+      router.replace('/(tabs)/HomeScreen');
     }
   };
 
-  // Render each slide
   const renderSlide: ListRenderItem<Slide> = ({ item }) => (
     <View style={[styles.slide, { width }]}>
       <View style={styles.imageRow}>
@@ -80,9 +58,9 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
           {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+      <TouchableOpacity onPress={() => router.push('/LoginScreen')}>
         <Text style={styles.loginText}>
-          Already have account? <Text style={styles.loginLink}>Login</Text>
+          Already have an account? <Text style={styles.loginLink}>Login</Text>
         </Text>
       </TouchableOpacity>
     </View>
@@ -103,7 +81,7 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
       }}
     />
   );
-};
+}
 
 const styles = StyleSheet.create({
   slide: {
@@ -164,5 +142,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
-export default WelcomeScreen;
