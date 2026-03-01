@@ -1,98 +1,380 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Image } from 'react-native';
+import TokenModal from '../payment';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const CATEGORIES = [
+  { id: '1', label: 'All' },
+  { id: '2', label: 'Tops' },
+  { id: '3', label: 'Bottoms' },
+  { id: '4', label: 'Outerwear' },
+  { id: '5', label: 'Dresses' },
+  { id: '6', label: 'Activewear' },
+  { id: '7', label: 'Shoes' },
+  { id: '8', label: 'Accessories' },
+];
+const SLOT_COUNT = 6;
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const [activeCategory, setActiveCategory] = useState('1');
+  const [wardrobeSource, setWardrobeSource] = useState<'saved' | 'YourClothes'>('saved');
+  const [showTokens, setShowTokens] = useState(false); // ← token modal state
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const savedWardrobeItems: Array<{ id: string }> = [];
+  const YourClothesWardrobeItems: Array<{ id: string }> = [];
+
+  const activeItems = wardrobeSource === 'saved' ? savedWardrobeItems : YourClothesWardrobeItems;
+  const wardrobeIsEmpty = activeItems.length === 0;
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+
+      {/* Background blobs */}
+      <View style={styles.blobTopRight} />
+      <View style={styles.blobBottomLeft} />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Top bar */}
+        <View style={styles.topBar}>
+
+          {/* ← Person icon now opens token modal */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => setShowTokens(true)}
+          >
+            <Ionicons name="person-outline" size={20} color="#3B3B3B" />
+          </TouchableOpacity>
+
+          <View style={styles.logoWrapper}>
+            <Image
+              source={require('../../assets/images/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
+
+          <TouchableOpacity style={styles.iconBtn}>
+            <Ionicons name="notifications-outline" size={20} color="#3B3B3B" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Heading + Your Clothes button */}
+        <View style={styles.headingRow}>
+          <Text style={styles.heading}>Craft your fit{'\n'}with Kiova</Text>
+
+          <TouchableOpacity
+            style={styles.yourClothesBtn}
+            onPress={() => setWardrobeSource((prev) => (prev === 'saved' ? 'YourClothes' : 'saved'))}
+          >
+            <Ionicons
+              name={wardrobeSource === 'saved' ? 'bookmark' : 'shirt-outline'}
+              size={13}
+              color="#fff"
+              style={{ marginRight: 5 }}
+            />
+            <Text style={styles.yourClothesText}>
+              {wardrobeSource === 'saved' ? 'Saved' : 'Your Clothes'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Category filters */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContainer}
+        >
+          {CATEGORIES.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.categoryChip, activeCategory === cat.id && styles.categoryChipActive]}
+              onPress={() => setActiveCategory(cat.id)}
+            >
+              <Text style={[styles.categoryText, activeCategory === cat.id && styles.categoryTextActive]}>
+                {cat.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Wardrobe area */}
+        <View style={styles.wardrobeBox}>
+          {wardrobeIsEmpty ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="information-circle-outline" size={28} color="#AAAAAA" />
+              <Text style={styles.emptyTitle}>
+                {wardrobeSource === 'saved'
+                  ? 'Your saved wardrobe is empty'
+                  : 'Your wardrobe is empty'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {wardrobeSource === 'saved'
+                  ? 'Save/import clothes first. Then come back to pick them here.'
+                  : 'Add clothes in your wardrobe first. Then come back to pick them here.'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.itemsGrid}>
+              {activeItems.map((item) => (
+                <View key={item.id} style={styles.itemCard} />
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Outfit Generator */}
+        <View style={styles.generatorSection}>
+          <Text style={styles.generatorTitle}>Outfit generator</Text>
+          <Text style={styles.generatorSub}>
+            Pick pieces above. They show here, then Generate to build an outfit.
+          </Text>
+
+          <View style={styles.slotsRow}>
+            {Array.from({ length: SLOT_COUNT }).map((_, i) => (
+              <View key={i} style={styles.slot} />
+            ))}
+          </View>
+
+          <View style={styles.previewBox}>
+            <Ionicons name="sparkles" size={28} color="#CCCCCC" />
+            <Text style={styles.previewText}>Generated outfit preview</Text>
+          </View>
+
+          <TouchableOpacity style={styles.generateBtn}>
+            <Text style={styles.generateText}>Generate</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 110 }} />
+      </ScrollView>
+
+      {/* ← Token modal sits outside ScrollView so it overlays everything */}
+      <TokenModal visible={showTokens} onClose={() => setShowTokens(false)} />
+
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safe: {
+    flex: 1,
+    backgroundColor: '#F5F3F0',
+  },
+  blobTopRight: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: '#F4C4C4',
+    opacity: 0.35,
+  },
+  blobBottomLeft: {
+    position: 'absolute',
+    bottom: 100,
+    left: -80,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: '#D4C8F0',
+    opacity: 0.35,
+  },
+  scroll: { flex: 1 },
+  scrollContent: { paddingTop: 12 },
+  topBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  headingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  heading: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    lineHeight: 34,
+    flex: 1,
+  },
+  yourClothesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginLeft: 12,
+    marginTop: 4,
+  },
+  yourClothesText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  categoriesContainer: {
+    paddingHorizontal: 20,
+    gap: 8,
+    marginBottom: 20,
+    flexDirection: 'row',
+  },
+  categoryChip: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderWidth: 1,
+    borderColor: '#E0DDD8',
+  },
+  categoryChipActive: {
+    backgroundColor: '#1A1A1A',
+    borderColor: '#1A1A1A',
+  },
+  categoryText: {
+    fontSize: 13,
+    color: '#444',
+    fontWeight: '500',
+  },
+  categoryTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  wardrobeBox: {
+    marginHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    padding: 24,
+    minHeight: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyState: {
     alignItems: 'center',
     gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#444',
+    marginTop: 6,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#888',
+    textAlign: 'center',
+    lineHeight: 19,
+    maxWidth: 260,
+  },
+  itemsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  itemCard: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  generatorSection: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    padding: 20,
+  },
+  generatorTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  generatorSub: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 16,
+  },
+  slotsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  slot: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#CCCCCC',
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
+  previewBox: {
+    height: 460,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  previewText: {
+    fontSize: 14,
+    color: '#AAAAAA',
+  },
+  generateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 24,
+    paddingVertical: 14,
+    alignSelf: 'flex-end',
+    paddingHorizontal: 24,
+  },
+  generateText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  logoImage: {
+    width: 120,
+    height: 40,
   },
 });

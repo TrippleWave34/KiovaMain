@@ -16,24 +16,35 @@ import { Ionicons } from '@expo/vector-icons';
 
 const FIREBASE_API_KEY = 'AIzaSyBZ_WLPCklEj7wWlyUjOFjJqChU6OglTpE';
 
-export default function LoginScreen() {
+export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
+  const handleSignUp = async () => {
+    if (!email || !password || !confirmPassword) {
       setError('Please fill in all fields');
       return;
     }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
     try {
       const response = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -49,19 +60,21 @@ export default function LoginScreen() {
 
       if (data.error) {
         const code = data.error.message;
-        if (code === 'EMAIL_NOT_FOUND' || code === 'INVALID_PASSWORD' || code === 'INVALID_LOGIN_CREDENTIALS') {
-          setError('Incorrect email or password');
+        if (code === 'EMAIL_EXISTS') {
+          setError('An account with this email already exists');
+        } else if (code === 'INVALID_EMAIL') {
+          setError('Invalid email address');
+        } else if (code === 'WEAK_PASSWORD : Password should be at least 6 characters') {
+          setError('Password must be at least 6 characters');
         } else if (code === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
           setError('Too many attempts. Try again later');
-        } else if (code === 'USER_DISABLED') {
-          setError('This account has been disabled');
         } else {
           setError('Something went wrong. Please try again');
         }
         return;
       }
 
-      // Login successful — data.idToken and data.localId are available here
+      // Sign up successful — data.idToken and data.localId available here
       router.replace('/(tabs)/HomeScreen');
 
     } catch (err) {
@@ -87,10 +100,10 @@ export default function LoginScreen() {
 
         <View style={styles.header}>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>✦ Welcome back</Text>
+            <Text style={styles.badgeText}>✦ Get started</Text>
           </View>
-          <Text style={styles.title}>Login to{'\n'}Kiova</Text>
-          <Text style={styles.subtitle}>Enter your credentials to continue</Text>
+          <Text style={styles.title}>Create your{'\n'}Account</Text>
+          <Text style={styles.subtitle}>Join Kiova and start styling</Text>
         </View>
 
         <View style={styles.form}>
@@ -126,6 +139,23 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Confirm Password */}
+          <View style={[styles.inputWrapper, confirmPassword && password !== confirmPassword && styles.inputError]}>
+            <Ionicons name="lock-closed-outline" size={18} color="#888" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#AAAAAA"
+              value={confirmPassword}
+              onChangeText={(t) => { setConfirmPassword(t); setError(''); }}
+              secureTextEntry={!showConfirm}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
+              <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={18} color="#888" />
+            </TouchableOpacity>
+          </View>
+
           {/* Error */}
           {error ? (
             <View style={styles.errorWrapper}>
@@ -134,20 +164,16 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          <TouchableOpacity style={styles.forgotWrapper}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
+          <TouchableOpacity style={styles.button} onPress={handleSignUp} disabled={loading}>
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.buttonText}>Login</Text>
+              : <Text style={styles.buttonText}>Create Account</Text>
             }
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.replace('/SignUpScreen')}>
-            <Text style={styles.signupText}>
-              Don't have an account? <Text style={styles.signupLink}>Sign up</Text>
+          <TouchableOpacity onPress={() => router.replace('/LoginScreen')}>
+            <Text style={styles.loginText}>
+              Already have an account? <Text style={styles.loginLink}>Login</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -168,15 +194,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 36, fontWeight: '800', color: '#1A1A1A', lineHeight: 44, marginBottom: 8 },
   subtitle: { fontSize: 14, color: '#888' },
   form: { gap: 14 },
-  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 16, paddingHorizontal: 16, height: 56, gap: 10 },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 16, paddingHorizontal: 16, height: 56, gap: 10, borderWidth: 1.5, borderColor: 'transparent' },
+  inputError: { borderColor: '#FF3B30' },
   inputIcon: { marginRight: 4 },
   input: { flex: 1, fontSize: 15, color: '#1A1A1A' },
   errorWrapper: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   errorText: { color: '#FF3B30', fontSize: 13, fontWeight: '600' },
-  forgotWrapper: { alignSelf: 'flex-end' },
-  forgotText: { fontSize: 13, color: '#6B4EFF', fontWeight: '600' },
-  button: { backgroundColor: '#1A1A1A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  button: { backgroundColor: '#1A1A1A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 4 },
   buttonText: { color: '#fff', fontWeight: '800', fontSize: 16, letterSpacing: 0.5 },
-  signupText: { fontSize: 14, color: '#555', textAlign: 'center', marginTop: 4 },
-  signupLink: { color: '#FF5722', fontWeight: '700' },
+  loginText: { fontSize: 14, color: '#555', textAlign: 'center', marginTop: 4 },
+  loginLink: { color: '#FF5722', fontWeight: '700' },
 });
