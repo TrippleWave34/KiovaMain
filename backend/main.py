@@ -16,7 +16,7 @@ from models import Image, Base
 import firebase_admin
 from firebase_admin import credentials, auth
 
-from savetoimgserver import store_image  # your image storage function
+from savetoimgserver import store_image  
 
 # -------------------------
 # Database dependency
@@ -34,15 +34,13 @@ def get_db():
 firebase_key = "hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json"
 cred = credentials.Certificate(firebase_key)
 firebase_admin.initialize_app(cred)
-custom_token = auth.create_custom_token("user-uid")
-print("CUSTOM: " ,custom_token)
+
 # -------------------------
 # FastAPI setup
 # -------------------------
 app = FastAPI()
 security = HTTPBearer()
 
- 
 
 # -------------------------
 # Models
@@ -61,23 +59,6 @@ Base.metadata.create_all(bind=engine)
 # Helper: Firebase REST sign-in (for testing / Postman)
 # -------------------------
 FIREBASE_API_KEY = os.getenv("API_KEY")  # your Firebase Web API key
-
-def sign_in_user(email: str, password: str) -> str:
-    """Sign in a user via Firebase REST API and get a valid ID token"""
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
-    payload = {
-        "email": email,
-        "password": password,
-        "returnSecureToken": True
-    }
-    resp = requests.post(url, json=payload)
-    resp.raise_for_status()
-    data = resp.json()
-    return data["idToken"]  # <-- this token works with Firebase Admin SDK
-
-# -------------------------
-# Dependency: get current user from token
-# -------------------------
 
 
 # -------------------------
@@ -164,4 +145,4 @@ async def generate_outfit(user = Depends(get_current_user), items: list[str] = F
 
     return ""
 
-#TODO: get azure database connection
+
