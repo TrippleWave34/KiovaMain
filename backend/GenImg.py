@@ -64,7 +64,7 @@ def gen_img(image_urls):
             )
        )
 
-        image_bytes = response.candidates[0].content.parts[0].inline_data
+        image_bytes = response.candidates[0].content.parts[0]
 
         return image_bytes
 
