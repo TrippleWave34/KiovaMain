@@ -8,9 +8,16 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons, Feather } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 
 const WEEKLY_FREE_TOKENS = 5;
 const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+// ⚠️ CHANGE THIS IF NEEDED:
+// - Android emulator: "http://10.0.2.2:8000"
+// - iOS simulator: usually "http://127.0.0.1:8000"
+// - Real phone (Expo Go): "http://YOUR_PC_IP:8000" (ex: http://192.168.1.20:8000)
+const API_URL = "http://10.1.24.78:8000";
 
 export default function TokenModal({
   visible,
@@ -36,21 +43,39 @@ export default function TokenModal({
     setNextReset(`${days}d ${hours}h`);
   }, [visible]);
 
-  const handleTopUp = (amount: number, price: string) => {
-    Alert.alert(
-      "Top Up Tokens",
-      `Purchase ${amount} tokens for ${price}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Buy",
-          onPress: () => {
-            setTokens((prev) => prev + amount);
-            Alert.alert("Success! 🎉", `${amount} tokens added to your account.`);
-          },
+  // ✅ Stripe version: calls backend and opens Stripe Checkout URL
+  const handleTopUp = async (plan: "basic" | "pro") => {
+    const pretty = plan === "basic" ? "5 tokens for £1.99" : "10 tokens for £2.99";
+
+    Alert.alert("Top Up Tokens", `Purchase ${pretty}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Buy",
+        onPress: async () => {
+          try {
+            const res = await fetch(`${API_URL}/payments/create-checkout-session-plan`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ plan }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+              throw new Error(data?.detail || "Failed to create checkout session");
+            }
+
+            // Open Stripe Checkout
+            await WebBrowser.openBrowserAsync(data.url);
+
+            // ✅ OPTIONAL (demo-only): instantly add tokens after checkout opens
+            // In a real app, you should add tokens ONLY after webhook confirms payment.
+            // setTokens((prev) => prev + (plan === "basic" ? 5 : 10));
+          } catch (e: any) {
+            Alert.alert("Payment error", e.message);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const tokenPercentage = Math.min((tokens / WEEKLY_FREE_TOKENS) * 100, 100);
@@ -114,7 +139,7 @@ export default function TokenModal({
 
           <TouchableOpacity
             style={styles.topUpOption}
-            onPress={() => handleTopUp(5, "£1.99")}
+            onPress={() => handleTopUp("basic")}
           >
             <View style={styles.topUpLeft}>
               <View style={[styles.topUpIconWrap, { backgroundColor: "#F4A26120" }]}>
@@ -132,7 +157,7 @@ export default function TokenModal({
 
           <TouchableOpacity
             style={[styles.topUpOption, styles.topUpOptionHighlight]}
-            onPress={() => handleTopUp(10, "£2.99")}
+            onPress={() => handleTopUp("pro")}
           >
             <View style={styles.topUpLeft}>
               <View style={[styles.topUpIconWrap, { backgroundColor: "#6B4EFF20" }]}>
