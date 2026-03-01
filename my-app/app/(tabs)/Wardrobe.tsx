@@ -7,12 +7,17 @@ import {
   Image,
   Dimensions,
   ScrollView,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { Ionicons, Feather } from "@expo/vector-icons";
-import TokenModal from '../payment';
+  FlatList,
+  Alert,
+  ActivityIndicator,
+  SafeAreaView,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get("window");
+const CARD_SIZE = (width - 48) / 2; // Define CARD_SIZE
 
 const CATEGORIES = [
   { id: "1", label: "All" },
@@ -36,42 +41,66 @@ export default function WardrobeScreen() {
   const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
   const [savedItems, setSavedItems] = useState<ClothingItem[]>([]);
   const [view, setView] = useState<"wardrobe" | "saved">("wardrobe");
-  const [showTokens, setShowTokens] = useState(false); // ← token modal state
+  const [showTokens, setShowTokens] = useState(false);
+  const [loading, setLoading] = useState(false); // Add loading state
 
   const isWardrobe = view === "wardrobe";
   const items = isWardrobe ? wardrobeItems : savedItems;
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 5],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      const newItem: ClothingItem = {
-        id: Date.now().toString(),
-        image: result.assets[0].uri,
-        category: "Tops",
-      };
-      if (isWardrobe) {
-        setWardrobeItems((prev) => [...prev, newItem]);
-      } else {
-        setSavedItems((prev) => [...prev, newItem]);
+    setLoading(true);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Permission needed", "Please grant permission to access your photos");
+        return;
       }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 5],
+        quality: 1,
+      });
+
+      if (!result.canceled) {
+        const newItem: ClothingItem = {
+          id: Date.now().toString(),
+          image: result.assets[0].uri,
+          category: "Tops", // You might want to let user select category
+        };
+        if (isWardrobe) {
+          setWardrobeItems((prev) => [...prev, newItem]);
+        } else {
+          setSavedItems((prev) => [...prev, newItem]);
+        }
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to pick image");
+    } finally {
+      setLoading(false);
     }
   };
 
   const removeItem = (id: string) => {
-    if (isWardrobe) {
-      setWardrobeItems((prev) => prev.filter((i) => i.id !== id));
-    } else {
-      setSavedItems((prev) => prev.filter((i) => i.id !== id));
-    }
+    Alert.alert(
+      "Remove Item",
+      "Are you sure you want to remove this item?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            if (isWardrobe) {
+              setWardrobeItems((prev) => prev.filter((i) => i.id !== id));
+            } else {
+              setSavedItems((prev) => prev.filter((i) => i.id !== id));
+            }
+          }
+        }
+      ]
+    );
   };
 
   const filteredItems =
@@ -79,416 +108,276 @@ export default function WardrobeScreen() {
       ? items
       : items.filter((item) => item.category === selectedCategory);
 
+  // Render each grid item
+  const renderItem = ({ item }: { item: ClothingItem }) => (
+    <TouchableOpacity
+      style={styles.card}
+      onLongPress={() => removeItem(item.id)}
+      delayLongPress={500}
+    >
+      <Image source={{ uri: item.image }} style={styles.image} />
+      <View style={styles.categoryTag}>
+        <Text style={styles.categoryText}>{item.category}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={styles.container}>
-      <View style={styles.blob1} />
-      <View style={styles.blob2} />
+    <SafeAreaView style={{ flex: 1 }}>
+      <LinearGradient
+        colors={['#F8F5FF', '#F9F2F5', '#F5F8FF']}
+        style={StyleSheet.absoluteFill}
+      />
 
-      {/* Top Header */}
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.iconCircle} onPress={() => setShowTokens(true)}>
-  <Ionicons name="person-outline" size={20} color="#555" />
-</TouchableOpacity>
-
-        {/* Logo — identical to HomeScreen */}
-        <View style={styles.logoWrapper}>
-          <Image
-            source={require('../../assets/images/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Wardrobe</Text>
+          <Text style={styles.subtitle}>
+            Add items and organize your looks.
+          </Text>
         </View>
 
         <TouchableOpacity style={styles.iconCircle}>
           <Ionicons name="notifications-outline" size={20} color="#555" />
         </TouchableOpacity>
-
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Title Row */}
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>
-            {isWardrobe ? "Your\nwardrobe" : "Saved\npieces"}
+      {/* Toggle Buttons */}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={[styles.toggleBtn, isWardrobe && styles.activeToggle]}
+          onPress={() => setView("wardrobe")}
+        >
+          <Text style={[styles.toggleText, isWardrobe && styles.activeToggleText]}>
+            Wardrobe
           </Text>
-          <View style={styles.titleButtons}>
-            {/* Toggle button */}
-            <TouchableOpacity
-              style={[
-                styles.outlineButton,
-                !isWardrobe && styles.outlineButtonActive,
-              ]}
-              onPress={() => {
-                setView(isWardrobe ? "saved" : "wardrobe");
-                setSelectedCategory("All");
-              }}
-            >
-              <Feather
-                name={isWardrobe ? "bookmark" : "shopping-bag"}
-                size={15}
-                color={isWardrobe ? "#1a1a1a" : "white"}
-              />
-              <Text
-                style={[
-                  styles.outlineButtonText,
-                  !isWardrobe && styles.outlineButtonTextActive,
-                ]}
-              >
-                {isWardrobe ? "Saved" : "Wardrobe"}
-              </Text>
-            </TouchableOpacity>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleBtn, !isWardrobe && styles.activeToggle]}
+          onPress={() => setView("saved")}
+        >
+          <Text style={[styles.toggleText, !isWardrobe && styles.activeToggleText]}>
+            Saved
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-            {/* Add / Save button */}
-            <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
-              <Feather name="plus" size={15} color="white" />
-              <Text style={styles.blackButtonText}>
-                {isWardrobe ? "Add item" : "Save item"}
-              </Text>
-            </TouchableOpacity>
-          
-          </View>
-        </View>
-
-        <Text style={styles.subtitle}>
-          {isWardrobe
-            ? "All your clothing pieces, organised in one place."
-            : "Pieces you saved from other clothing stores, use them to test outfits before you buy."}
+      {/* Title row with buttons */}
+      <View style={styles.titleRow}>
+        <Text style={styles.sectionTitle}>
+          {isWardrobe ? "Your Wardrobe" : "Saved Items"}
         </Text>
 
-        {/* Category Filters */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-          contentContainerStyle={styles.filterRow}
-        >
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              onPress={() => setSelectedCategory(cat.label)}
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={pickImage}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="add" size={16} color="#fff" />
+                <Text style={styles.btnText}>Add</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <Text style={styles.subtitle}>
+        All your clothing pieces, organised in one place.
+      </Text>
+
+      {/* CATEGORY FILTER */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginTop: 10 }}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
+      >
+        {CATEGORIES.map((cat) => (
+          <TouchableOpacity
+            key={cat.id} // Use cat.id, not cat
+            style={[
+              styles.pill,
+              selectedCategory === cat.label && styles.activePill, // Compare with cat.label
+            ]}
+            onPress={() => setSelectedCategory(cat.label)} // Use cat.label
+          >
+            <Text
               style={[
-                styles.filterButton,
-                selectedCategory === cat.label && styles.activeFilter,
+                styles.pillText,
+                selectedCategory === cat.label && { color: '#fff' }, // Use cat.label
               ]}
             >
-              <Text
-                style={[
-                  styles.filterText,
-                  selectedCategory === cat.label && styles.activeFilterText,
-                ]}
-              >
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Grid or Empty State */}
-        {filteredItems.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={styles.emptyIconWrap}>
-              <Feather
-                name={isWardrobe ? "shopping-bag" : "bookmark"}
-                size={28}
-                color="#bbb"
-              />
-            </View>
-            <Text style={styles.emptyTitle}>
-              {isWardrobe ? "No items yet" : "Nothing saved yet"}
+              {cat.label} {/* Use cat.label */}
             </Text>
-            <Text style={styles.emptySub}>
-              {isWardrobe
-                ? 'Tap "Add item" to start building your wardrobe.'
-                : "Save pieces from online stores to try them in outfits before you buy."}
-            </Text>
-            <TouchableOpacity style={styles.emptyButton} onPress={pickImage}>
-              <Feather name="plus" size={16} color="white" />
-              <Text style={styles.emptyButtonText}>
-                {isWardrobe ? "Add your first item" : "Save your first piece"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.grid}>
-            {filteredItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.card}
-                onLongPress={() => removeItem(item.id)}
-              >
-                <Image source={{ uri: item.image }} style={styles.image} />
-                <View style={styles.cardTag}>
-                  <Text style={styles.cardTagText}>{item.category}</Text>
-                </View>
-              </TouchableOpacity>
-             
-            ))}
-          </View>
-        )}
+          </TouchableOpacity>
+        ))}
       </ScrollView>
-      <TokenModal visible={showTokens} onClose={() => setShowTokens(false)} />
-    </View>
+
+      {/* GRID */}
+      {filteredItems.length > 0 ? (
+        <FlatList
+          data={filteredItems}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={{ padding: 16 }}
+          columnWrapperStyle={{ justifyContent: 'space-between' }}
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="images-outline" size={60} color="#ccc" />
+          <Text style={styles.emptyText}>No items yet</Text>
+          <Text style={styles.emptySubtext}>Tap Add to add clothing items</Text>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111',
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#777',
+    marginTop: 4,
+    paddingHorizontal: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f0f0f0',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 25,
+    padding: 4,
+  },
+  toggleBtn: {
     flex: 1,
-    backgroundColor: "#F5F3F0",
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 21,
   },
-
-  blob1: {
-    position: "absolute",
-    top: -60,
-    right: -60,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: "#F4C4C4",
-    opacity: 0.35,
+  activeToggle: {
+    backgroundColor: '#111',
   },
-
-  blob2: {
-    position: "absolute",
-    bottom: 100,
-    left: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: "#D4C8F0",
-    opacity: 0.35,
+  toggleText: {
+    fontWeight: '500',
+    color: '#666',
   },
-
-  topBar: {
-    marginTop: 58,
-    marginBottom: 8,
-    paddingHorizontal: 22,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  activeToggleText: {
+    color: '#fff',
   },
-
   iconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-
-  // ← Matches HomeScreen exactly
-  logoWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  logoImage: {
-    width: 120,
-    height: 40,
-  },
-
-  scrollContent: {
-    paddingHorizontal: 22,
-    paddingBottom: 60,
-  },
-
-  titleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    marginTop: 28,
-  },
-
-  title: {
-    fontSize: 42,
-    fontWeight: "800",
-    color: "#1a1a1a",
-    lineHeight: 48,
-  },
-
-  titleButtons: {
-    flexDirection: "column",
-    gap: 8,
-    marginBottom: 6,
-  },
-
-  outlineButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "transparent",
+  addBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#111',
     paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 30,
-    borderWidth: 1.5,
-    borderColor: "#1a1a1a",
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: 'center',
     gap: 6,
-    justifyContent: "center",
   },
-
-  outlineButtonActive: {
-    backgroundColor: "#1a1a1a",
-    borderColor: "#1a1a1a",
+  btnText: {
+    color: '#fff',
+    fontWeight: '600',
   },
-
-  outlineButtonText: {
-    color: "#1a1a1a",
-    fontWeight: "700",
-    fontSize: 14,
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#EAEAEA',
+    borderRadius: 20,
+    marginRight: 8,
   },
-
-  outlineButtonTextActive: {
-    color: "white",
+  activePill: {
+    backgroundColor: '#111',
   },
-
-  blackButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a1a",
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderRadius: 30,
-    gap: 6,
-    justifyContent: "center",
+  pillText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
-
-  blackButtonText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 14,
-  },
-
-  subtitle: {
-    marginTop: 10,
-    color: "#888",
-    fontSize: 14,
-    lineHeight: 20,
-  },
-
-  filterScroll: {
-    marginTop: 22,
-    flexGrow: 0,
-  },
-
-  filterRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingRight: 10,
-  },
-
-  filterButton: {
-    backgroundColor: "rgba(255,255,255,0.85)",
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.07)",
-  },
-
-  activeFilter: {
-    backgroundColor: "#1a1a1a",
-    borderColor: "#1a1a1a",
-  },
-
-  filterText: {
-    fontWeight: "600",
-    color: "#444",
-    fontSize: 14,
-  },
-
-  activeFilterText: {
-    color: "white",
-  },
-
-  emptyState: {
-    alignItems: "center",
-    marginTop: 50,
-    paddingHorizontal: 20,
-  },
-
-  emptyIconWrap: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
-  },
-
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    marginBottom: 8,
-  },
-
-  emptySub: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 28,
-  },
-
-  emptyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a1a",
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 30,
-    gap: 8,
-  },
-
-  emptyButtonText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 20,
-    gap: 12,
-  },
-
   card: {
-    width: (width - 56) / 2,
-    height: 210,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderRadius: 18,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
+    width: CARD_SIZE,
+    height: CARD_SIZE * 1.3,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    position: 'relative',
   },
-
   image: {
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
   },
-
-  cardTag: {
-    position: "absolute",
-    bottom: 10,
-    left: 10,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    paddingHorizontal: 10,
+  categoryTag: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 19,
+    borderRadius: 12,
   },
-
-  cardTagText: {
-    color: "white",
-    fontSize: 11,
-    fontWeight: "600",
+  categoryText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 100,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#999',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#ccc',
+    marginTop: 8,
   },
 });
