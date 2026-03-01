@@ -1,7 +1,8 @@
 {
   "dependencies": {
-    "expo": "^55.0.4",
-    "expo-router": "^55.0.3",
+    "expo": "^52",
+    "expo-router": "~4.0.22",
+    "firebase": "^12.10.0",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
