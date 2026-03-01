@@ -9,9 +9,8 @@ import {
   Dimensions,
   ScrollView,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
-import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 
 const { width } = Dimensions.get("window");
 
@@ -63,123 +62,157 @@ export default function WardrobeScreen() {
       : items.filter((item) => item.category === selectedCategory);
 
   return (
-    <LinearGradient
-      colors={["#f8d7e3", "#e8d5f0", "#d5e8f8", "#f0e6d8"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      {/* Decorative blob — matches home page */}
+      <View style={styles.blob1} />
+      <View style={styles.blob2} />
+
       {/* Top Header */}
       <View style={styles.topBar}>
-        {/* Person icon in circle */}
         <TouchableOpacity style={styles.iconCircle}>
-          <Ionicons name="person-outline" size={22} color="#555" />
+          <Ionicons name="person-outline" size={20} color="#555" />
         </TouchableOpacity>
 
-        {/* Logo with sparkle */}
         <View style={styles.logoContainer}>
           <Ionicons
             name="sparkles"
-            size={18}
+            size={14}
             color="#6B4EFF"
             style={styles.sparkle}
           />
           <Text style={styles.logo}>Kiova</Text>
         </View>
 
-        {/* Bell icon in circle */}
         <TouchableOpacity style={styles.iconCircle}>
-          <Ionicons name="notifications-outline" size={22} color="#555" />
+          <Ionicons name="notifications-outline" size={20} color="#555" />
         </TouchableOpacity>
       </View>
 
-      {/* Title row with buttons */}
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>{"Your wa\nrdrobe"}</Text>
-
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.blackButton}>
-            <Feather name="bookmark" size={16} color="white" />
-            <Text style={styles.blackButtonText}>Saved</Text>
-          </TouchableOpacity>
-
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Title Row */}
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{"Your\nwardrobe"}</Text>
           <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
             <Feather name="plus" size={16} color="white" />
-            <Text style={styles.blackButtonText}>Add</Text>
+            <Text style={styles.blackButtonText}>Add item</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Subtitle */}
-      <Text style={styles.subtitle}>
-        All your pieces live here. Add items, filter by category,{"\n"}
-        and build outfits faster.
-      </Text>
+        <Text style={styles.subtitle}>
+          All your clothing pieces, organised in one place.
+        </Text>
 
-      {/* Category Filters - horizontal scroll */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterScroll}
-        contentContainerStyle={styles.filterRow}
-      >
-        {CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            onPress={() => setSelectedCategory(cat.label)}
-            style={[
-              styles.filterButton,
-              selectedCategory === cat.label && styles.activeFilter,
-            ]}
-          >
-            <Text
+        {/* Category Filters */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={styles.filterRow}
+        >
+          {CATEGORIES.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              onPress={() => setSelectedCategory(cat.label)}
               style={[
-                styles.filterText,
-                selectedCategory === cat.label && styles.activeFilterText,
+                styles.filterButton,
+                selectedCategory === cat.label && styles.activeFilter,
               ]}
             >
-              {cat.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <Text
+                style={[
+                  styles.filterText,
+                  selectedCategory === cat.label && styles.activeFilterText,
+                ]}
+              >
+                {cat.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-      {/* Clothing Grid */}
-      <FlatList
-        data={filteredItems}
-        numColumns={2}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 10 }}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Image source={{ uri: item.image }} style={styles.image} />
+        
+
+        {/* Grid or Empty State */}
+        {filteredItems.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIconWrap}>
+              <Feather name="shopping-bag" size={28} color="#bbb" />
+            </View>
+            <Text style={styles.emptyTitle}>No items yet</Text>
+            <Text style={styles.emptySub}>
+              Tap "Add item" to start building your wardrobe.
+            </Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={pickImage}>
+              <Feather name="plus" size={16} color="white" />
+              <Text style={styles.emptyButtonText}>Add your first item</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            {filteredItems.map((item) => (
+              <View key={item.id} style={styles.card}>
+                <Image source={{ uri: item.image }} style={styles.image} />
+                <View style={styles.cardTag}>
+                  <Text style={styles.cardTagText}>{item.category}</Text>
+                </View>
+              </View>
+            ))}
           </View>
         )}
-      />
-    </LinearGradient>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 20,
+    backgroundColor: "#F5F3F0",  // ← exact home page background
+  },
+
+  blob1: {
+    position: 'absolute',
+    top: -60,
+    right: -60,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: '#F4C4C4',
+    opacity: 0.35,
+  },
+
+  blob2: {
+    position: 'absolute',
+    bottom: 100,
+    left: -80,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: '#D4C8F0',
+    opacity: 0.35,
   },
 
   topBar: {
-    marginTop: 60,
+    marginTop: 58,
+    marginBottom: 8,
+    paddingHorizontal: 22,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.6)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.75)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
   },
 
   logoContainer: {
@@ -187,36 +220,33 @@ const styles = StyleSheet.create({
   },
 
   sparkle: {
-    marginBottom: -4,
-    alignSelf: "center",
+    marginBottom: -2,
   },
 
   logo: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "800",
     color: "#F4A261",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 22,
+    paddingBottom: 60,
   },
 
   titleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginTop: 30,
+    alignItems: "flex-end",
+    marginTop: 28,
   },
 
   title: {
-    fontSize: 44,
-    fontWeight: "900",
-    color: "black",
-    lineHeight: 50,
-    flex: 1,
-  },
-
-  headerButtons: {
-    flexDirection: "column",
-    gap: 10,
-    marginTop: 4,
+    fontSize: 42,
+    fontWeight: "800",
+    color: "#1a1a1a",
+    lineHeight: 48,
   },
 
   blackButton: {
@@ -224,44 +254,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#1a1a1a",
     paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingVertical: 13,
     borderRadius: 30,
     gap: 6,
-    minWidth: 110,
-    justifyContent: "center",
+    marginBottom: 6,
   },
 
   blackButtonText: {
     color: "white",
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 14,
   },
 
   subtitle: {
-    marginTop: 16,
-    color: "#555",
-    fontSize: 15,
-    lineHeight: 22,
+    marginTop: 10,
+    color: "#888",
+    fontSize: 14,
+    lineHeight: 20,
   },
 
   filterScroll: {
-    marginTop: 24,
+    marginTop: 22,
     flexGrow: 0,
   },
 
   filterRow: {
     flexDirection: "row",
-    gap: 10,
-    paddingRight: 20,
+    gap: 8,
+    paddingRight: 10,
   },
 
   filterButton: {
-    backgroundColor: "rgba(255,255,255,0.75)",
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    backgroundColor: "rgba(255,255,255,0.85)",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderRadius: 30,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.9)",
+    borderColor: "rgba(0,0,0,0.07)",
   },
 
   activeFilter: {
@@ -271,25 +300,127 @@ const styles = StyleSheet.create({
 
   filterText: {
     fontWeight: "600",
-    color: "#333",
-    fontSize: 15,
+    color: "#444",
+    fontSize: 14,
   },
 
   activeFilterText: {
     color: "white",
   },
 
+  savedCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255,255,255,0.85)",
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 24,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
+  },
+
+  savedCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  savedCardTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+
+  savedCardSub: {
+    fontSize: 13,
+    color: "#999",
+    marginTop: 2,
+  },
+
+  emptyState: {
+    alignItems: "center",
+    marginTop: 50,
+    paddingHorizontal: 20,
+  },
+
+  emptyIconWrap: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    marginBottom: 8,
+  },
+
+  emptySub: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 28,
+  },
+
+  emptyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
+    gap: 8,
+  },
+
+  emptyButtonText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 20,
+    gap: 12,
+  },
+
   card: {
-    width: width / 2 - 30,
-    height: 200,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 20,
-    margin: 10,
+    width: (width - 56) / 2,
+    height: 210,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 18,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
   },
 
   image: {
     width: "100%",
     height: "100%",
+  },
+
+  cardTag: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+
+  cardTagText: {
+    color: "white",
+    fontSize: 11,
+    fontWeight: "600",
   },
 });
