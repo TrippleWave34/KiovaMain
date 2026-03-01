@@ -122,39 +122,37 @@ export default function SavedOutfit() {
         onMomentumScrollEnd={onScroll}
         renderItem={({ item }) => (
           <View style={styles.page}>
-            {/* Big outfit image */}
+
+            {/* Tall outfit image */}
             <View style={styles.outfitImage}>
               <Ionicons name="sparkles" size={52} color="#CCCCCC" />
               <Text style={styles.outfitImageText}>AI Generated Outfit</Text>
             </View>
 
-            {/* Outfit info card */}
+            {/* Compact info card */}
             <View style={styles.infoCard}>
-              {/* Name row */}
               <View style={styles.nameRow}>
-                <Text style={styles.outfitName}>{item.name || 'Untitled'}</Text>
+                <View>
+                  <Text style={styles.outfitName}>{item.name || 'Untitled'}</Text>
+                  <Text style={styles.outfitDate}>Saved {item.date}</Text>
+                </View>
                 <TouchableOpacity style={styles.renameBtn} onPress={openRename}>
-                  <Ionicons name="pencil-outline" size={15} color="#6B4EFF" />
+                  <Ionicons name="pencil-outline" size={14} color="#6B4EFF" />
                   <Text style={styles.renameBtnText}>Rename</Text>
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.outfitDate}>Saved {item.date}</Text>
-
-              {/* Clothes used */}
-              <Text style={styles.itemsLabel}>Clothes used</Text>
               <View style={styles.itemsRow}>
                 {item.items.map((cloth, i) => (
                   <View key={i} style={styles.itemChip}>
-                    <Ionicons name="shirt-outline" size={12} color="#6B4EFF" />
+                    <Ionicons name="shirt-outline" size={11} color="#6B4EFF" />
                     <Text style={styles.itemChipText}>{cloth}</Text>
                   </View>
                 ))}
               </View>
 
-              {/* Delete */}
               <TouchableOpacity style={styles.deleteBtn} onPress={deleteOutfit}>
-                <Ionicons name="trash-outline" size={15} color="#FF3B30" />
+                <Ionicons name="trash-outline" size={14} color="#FF3B30" />
                 <Text style={styles.deleteBtnText}>Delete outfit</Text>
               </TouchableOpacity>
             </View>
@@ -192,6 +190,7 @@ export default function SavedOutfit() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F3F0' },
+
   blobTopRight: {
     position: 'absolute', top: -60, right: -60,
     width: 250, height: 250, borderRadius: 125,
@@ -202,10 +201,11 @@ const styles = StyleSheet.create({
     width: 240, height: 240, borderRadius: 120,
     backgroundColor: '#D4C8F0', opacity: 0.35,
   },
+
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'flex-start', paddingHorizontal: 24,
-    paddingTop: 16, marginBottom: 12,
+    paddingTop: 16, marginBottom: 10,
   },
   title: { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
   subtitle: { fontSize: 13, color: '#888', marginTop: 4 },
@@ -215,80 +215,77 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 12, fontWeight: '700', color: '#6B4EFF', letterSpacing: 1 },
 
-  // Dots
   dots: {
     flexDirection: 'row', justifyContent: 'center',
-    gap: 6, marginBottom: 16,
+    gap: 6, marginBottom: 12,
   },
-  dot: {
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: '#D0CCE8',
-  },
-  dotActive: {
-    width: 20, backgroundColor: '#6B4EFF',
-  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D0CCE8' },
+  dotActive: { width: 20, backgroundColor: '#6B4EFF' },
 
-  // Page
   page: {
     width,
-    paddingHorizontal: 20,
+    paddingHorizontal: 40,
     paddingBottom: 110,
   },
 
-  // Outfit image area
   outfitImage: {
     width: '100%',
-    height: height * 0.42,
+    height: height * 0.52,
     borderRadius: 28,
     backgroundColor: '#EEECEA',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    marginTop: 35,
     gap: 12,
   },
   outfitImageText: { fontSize: 14, color: '#AAAAAA' },
 
-  // Info card
+  // ← Smaller card
   infoCard: {
     backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 20,
+    padding: 12,
   },
+
   nameRow: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', marginBottom: 4,
+    flexDirection: 'row', alignItems: 'flex-start',
+    justifyContent: 'space-between', marginBottom: 8,
   },
-  outfitName: { fontSize: 20, fontWeight: '800', color: '#1A1A1A' },
+  outfitName: { fontSize: 15, fontWeight: '800', color: '#1A1A1A' },
+  outfitDate: { fontSize: 11, color: '#888', marginTop: 1 },
+
   renameBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: '#F0EDFF', borderRadius: 20,
     paddingHorizontal: 12, paddingVertical: 6,
   },
   renameBtnText: { fontSize: 12, fontWeight: '700', color: '#6B4EFF' },
-  outfitDate: { fontSize: 13, color: '#888', marginBottom: 16 },
-  itemsLabel: { fontSize: 13, fontWeight: '700', color: '#444', marginBottom: 10 },
-  itemsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  itemChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: '#F0EDFF', borderRadius: 20,
-    paddingHorizontal: 12, paddingVertical: 7,
+
+  itemsRow: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    gap: 5, marginBottom: 10,
   },
-  itemChipText: { fontSize: 12, fontWeight: '600', color: '#1A1A1A' },
+  itemChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#F0EDFF', borderRadius: 20,
+    paddingHorizontal: 9, paddingVertical: 4,
+  },
+  itemChipText: { fontSize: 11, fontWeight: '600', color: '#1A1A1A' },
+
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12, borderRadius: 50,
+    gap: 6, paddingVertical: 9, borderRadius: 50,
     backgroundColor: '#FFE5E5',
   },
-  deleteBtnText: { fontSize: 14, fontWeight: '700', color: '#FF3B30' },
+  deleteBtnText: { fontSize: 12, fontWeight: '700', color: '#FF3B30' },
 
-  // Empty state
   emptyState: {
     flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40,
   },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#444', marginTop: 16, marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
 
-  // Modal
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems: 'center', justifyContent: 'center',

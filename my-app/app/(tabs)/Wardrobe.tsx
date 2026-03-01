@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, Feather } from "@expo/vector-icons";
+import TokenModal from '../payment';
 
 const { width } = Dimensions.get("window");
 
@@ -35,6 +36,7 @@ export default function WardrobeScreen() {
   const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
   const [savedItems, setSavedItems] = useState<ClothingItem[]>([]);
   const [view, setView] = useState<"wardrobe" | "saved">("wardrobe");
+  const [showTokens, setShowTokens] = useState(false); // ← token modal state
 
   const isWardrobe = view === "wardrobe";
   const items = isWardrobe ? wardrobeItems : savedItems;
@@ -84,23 +86,23 @@ export default function WardrobeScreen() {
 
       {/* Top Header */}
       <View style={styles.topBar}>
-        <TouchableOpacity style={styles.iconCircle}>
-          <Ionicons name="person-outline" size={20} color="#555" />
-        </TouchableOpacity>
+        <TouchableOpacity style={styles.iconCircle} onPress={() => setShowTokens(true)}>
+  <Ionicons name="person-outline" size={20} color="#555" />
+</TouchableOpacity>
 
-        <View style={styles.logoContainer}>
-          <Ionicons
-            name="sparkles"
-            size={14}
-            color="#6B4EFF"
-            style={styles.sparkle}
+        {/* Logo — identical to HomeScreen */}
+        <View style={styles.logoWrapper}>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
           />
-          <Text style={styles.logo}>Kiova</Text>
         </View>
 
         <TouchableOpacity style={styles.iconCircle}>
           <Ionicons name="notifications-outline" size={20} color="#555" />
         </TouchableOpacity>
+
       </View>
 
       <ScrollView
@@ -139,13 +141,14 @@ export default function WardrobeScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Add button */}
+            {/* Add / Save button */}
             <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
               <Feather name="plus" size={15} color="white" />
               <Text style={styles.blackButtonText}>
                 {isWardrobe ? "Add item" : "Save item"}
               </Text>
             </TouchableOpacity>
+          
           </View>
         </View>
 
@@ -221,10 +224,12 @@ export default function WardrobeScreen() {
                   <Text style={styles.cardTagText}>{item.category}</Text>
                 </View>
               </TouchableOpacity>
+             
             ))}
           </View>
         )}
       </ScrollView>
+      <TokenModal visible={showTokens} onClose={() => setShowTokens(false)} />
     </View>
   );
 }
@@ -277,19 +282,15 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.06)",
   },
 
-  logoContainer: {
+  // ← Matches HomeScreen exactly
+  logoWrapper: {
+    flexDirection: "row",
     alignItems: "center",
   },
 
-  sparkle: {
-    marginBottom: -2,
-  },
-
-  logo: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#F4A261",
-    letterSpacing: 0.5,
+  logoImage: {
+    width: 120,
+    height: 40,
   },
 
   scrollContent: {

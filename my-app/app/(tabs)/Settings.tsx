@@ -7,9 +7,11 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  Image,
 } from "react-native";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from 'expo-router';
+import TokenModal from '../payment';
 
 export default function SettingsScreen() {
   const [showAccount, setShowAccount] = useState(false);
@@ -17,6 +19,7 @@ export default function SettingsScreen() {
   const [showTerms, setShowTerms] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+  const [showTokens, setShowTokens] = useState(false); // ← token modal state
 
   const RowItem = ({
     icon,
@@ -46,13 +49,19 @@ export default function SettingsScreen() {
 
       {/* Header */}
       <View style={styles.topBar}>
-        <TouchableOpacity style={styles.iconCircle}>
+        <TouchableOpacity style={styles.iconCircle} onPress={() => setShowTokens(true)}>
           <Ionicons name="person-outline" size={20} color="#555" />
         </TouchableOpacity>
-        <View style={styles.logoContainer}>
-          <Ionicons name="sparkles" size={14} color="#6B4EFF" style={styles.sparkle} />
-          <Text style={styles.logo}>Kiova</Text>
+
+        {/* ← Updated logo, matches HomeScreen */}
+        <View style={styles.logoWrapper}>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
+
         <TouchableOpacity style={styles.iconCircle}>
           <Ionicons name="notifications-outline" size={20} color="#555" />
         </TouchableOpacity>
@@ -183,8 +192,11 @@ export default function SettingsScreen() {
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <View style={styles.aboutLogoRow}>
-              <Ionicons name="sparkles" size={16} color="#6B4EFF" />
-              <Text style={styles.aboutLogo}>Kiova</Text>
+              <Image
+                source={require('../../assets/images/logo.png')}
+                style={styles.aboutLogoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.modalTitle}>About Us</Text>
 
@@ -262,6 +274,8 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+<TokenModal visible={showTokens} onClose={() => setShowTokens(false)} />
     </View>
   );
 }
@@ -270,11 +284,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F3F0" },
   blob1: { position: "absolute", top: -60, right: -60, width: 280, height: 280, borderRadius: 140, backgroundColor: "#F4C4C4", opacity: 0.35 },
   blob2: { position: "absolute", bottom: 100, left: -80, width: 260, height: 260, borderRadius: 130, backgroundColor: "#D4C8F0", opacity: 0.35 },
+
   topBar: { marginTop: 58, marginBottom: 8, paddingHorizontal: 22, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   iconCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.75)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(0,0,0,0.06)" },
-  logoContainer: { alignItems: "center" },
-  sparkle: { marginBottom: -2 },
-  logo: { fontSize: 24, fontWeight: "800", color: "#F4A261", letterSpacing: 0.5 },
+
+  // ← New logo styles, matches HomeScreen
+  logoWrapper: { flexDirection: "row", alignItems: "center" },
+  logoImage: { width: 120, height: 40 },
+
   scrollContent: { paddingHorizontal: 22, paddingBottom: 110 },
   title: { fontSize: 36, fontWeight: "800", color: "#1a1a1a", marginTop: 28, marginBottom: 24 },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: "#aaa", letterSpacing: 1, textTransform: "uppercase", marginBottom: 10, marginLeft: 4 },
@@ -302,8 +319,11 @@ const styles = StyleSheet.create({
   changePasswordText: { fontWeight: "700", color: "#1a1a1a", fontSize: 14 },
   closeBtn: { marginTop: 16, backgroundColor: "#1a1a1a", paddingVertical: 14, borderRadius: 30, alignItems: "center" },
   closeBtnText: { color: "white", fontWeight: "700", fontSize: 15 },
-  aboutLogoRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
-  aboutLogo: { fontSize: 20, fontWeight: "800", color: "#F4A261" },
+
+  // ← Updated About logo to use image
+  aboutLogoRow: { alignItems: "center", marginBottom: 8 },
+  aboutLogoImage: { width: 100, height: 34 },
+
   aboutBody: { fontSize: 14, color: "#555", lineHeight: 22 },
   aboutBullet: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
   aboutBulletText: { fontSize: 14, color: "#1a1a1a", fontWeight: "600" },
