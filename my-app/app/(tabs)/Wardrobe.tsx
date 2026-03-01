@@ -8,10 +8,13 @@ import {
   Image,
   Dimensions,
   ScrollView,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import * as ImagePicker from "expo-image-picker";
-import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+  Dimensions,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get("window");
 
@@ -63,28 +66,19 @@ export default function WardrobeScreen() {
       : items.filter((item) => item.category === selectedCategory);
 
   return (
-    <LinearGradient
-      colors={["#f8d7e3", "#e8d5f0", "#d5e8f8", "#f0e6d8"]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.container}
-    >
-      {/* Top Header */}
-      <View style={styles.topBar}>
-        {/* Person icon in circle */}
-        <TouchableOpacity style={styles.iconCircle}>
-          <Ionicons name="person-outline" size={22} color="#555" />
-        </TouchableOpacity>
+    <SafeAreaView style={{ flex: 1 }}>
+      <LinearGradient
+        colors={['#F8F5FF', '#F9F2F5', '#F5F8FF']}
+        style={StyleSheet.absoluteFill}
+      />
 
-        {/* Logo with sparkle */}
-        <View style={styles.logoContainer}>
-          <Ionicons
-            name="sparkles"
-            size={18}
-            color="#6B4EFF"
-            style={styles.sparkle}
-          />
-          <Text style={styles.logo}>Kiova</Text>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>Your wardrobe</Text>
+          <Text style={styles.subtitle}>
+            Add items and organize your looks.
+          </Text>
         </View>
 
         {/* Bell icon in circle */}
@@ -98,198 +92,139 @@ export default function WardrobeScreen() {
         <Text style={styles.title}>{"Your wa\nrdrobe"}</Text>
 
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.blackButton}>
-            <Feather name="bookmark" size={16} color="white" />
-            <Text style={styles.blackButtonText}>Saved</Text>
+          <TouchableOpacity style={styles.savedBtn}>
+            <Ionicons name="bookmark" size={16} color="#fff" />
+            <Text style={styles.btnText}>Saved</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
-            <Feather name="plus" size={16} color="white" />
-            <Text style={styles.blackButtonText}>Add</Text>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={pickImage}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="add" size={16} color="#fff" />
+                <Text style={styles.btnText}>Add</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Subtitle */}
-      <Text style={styles.subtitle}>
-        All your pieces live here. Add items, filter by category,{"\n"}
-        and build outfits faster.
-      </Text>
+        <Text style={styles.subtitle}>
+          All your clothing pieces, organised in one place.
+        </Text>
 
-      {/* Category Filters - horizontal scroll */}
+      {/* CATEGORY FILTER */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.filterScroll}
-        contentContainerStyle={styles.filterRow}
+        style={{ marginTop: 10 }}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
       >
         {CATEGORIES.map((cat) => (
           <TouchableOpacity
-            key={cat.id}
-            onPress={() => setSelectedCategory(cat.label)}
+            key={cat}
             style={[
-              styles.filterButton,
-              selectedCategory === cat.label && styles.activeFilter,
+              styles.pill,
+              selectedCategory === cat && styles.activePill,
             ]}
+            onPress={() => setSelectedCategory(cat)}
           >
             <Text
               style={[
-                styles.filterText,
-                selectedCategory === cat.label && styles.activeFilterText,
+                styles.pillText,
+                selectedCategory === cat && { color: '#fff' },
               ]}
             >
-              {cat.label}
+              {cat}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Clothing Grid */}
+      {/* GRID */}
       <FlatList
-        data={filteredItems}
-        numColumns={2}
+        data={filtered}
+        renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 40, paddingTop: 10 }}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Image source={{ uri: item.image }} style={styles.image} />
-          </View>
-        )}
+        numColumns={2}
+        contentContainerStyle={{ padding: 16 }}
+        columnWrapperStyle={{ justifyContent: 'space-between' }}
       />
-    </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-
-  topBar: {
-    marginTop: 60,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  logoContainer: {
-    alignItems: "center",
-  },
-
-  sparkle: {
-    marginBottom: -4,
-    alignSelf: "center",
-  },
-
-  logo: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#F4A261",
-    letterSpacing: 1,
-  },
-
-  titleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginTop: 30,
-  },
-
   title: {
-    fontSize: 44,
-    fontWeight: "900",
-    color: "black",
-    lineHeight: 50,
-    flex: 1,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111',
   },
-
-  headerButtons: {
-    flexDirection: "column",
-    gap: 10,
+  subtitle: {
+    fontSize: 13,
+    color: '#777',
     marginTop: 4,
   },
-
-  blackButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1a1a1a",
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 30,
-    gap: 6,
-    minWidth: 110,
-    justifyContent: "center",
-  },
-
-  blackButtonText: {
-    color: "white",
-    fontWeight: "700",
-    fontSize: 15,
-  },
-
-  subtitle: {
-    marginTop: 16,
-    color: "#555",
-    fontSize: 15,
-    lineHeight: 22,
-  },
-
-  filterScroll: {
-    marginTop: 24,
-    flexGrow: 0,
-  },
-
-  filterRow: {
-    flexDirection: "row",
+  headerButtons: {
+    flexDirection: 'row',
     gap: 10,
-    paddingRight: 20,
+    alignItems: 'center',
   },
-
-  filterButton: {
-    backgroundColor: "rgba(255,255,255,0.75)",
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.9)",
-  },
-
-  activeFilter: {
-    backgroundColor: "#1a1a1a",
-    borderColor: "#1a1a1a",
-  },
-
-  filterText: {
-    fontWeight: "600",
-    color: "#333",
-    fontSize: 15,
-  },
-
-  activeFilterText: {
-    color: "white",
-  },
-
-  card: {
-    width: width / 2 - 30,
-    height: 200,
-    backgroundColor: "rgba(255,255,255,0.7)",
+  savedBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#111',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
-    margin: 10,
-    overflow: "hidden",
+    alignItems: 'center',
+    gap: 6,
   },
-
+  addBtn: {
+    flexDirection: 'row',
+    backgroundColor: '#111',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    gap: 6,
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#EAEAEA',
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  activePill: {
+    backgroundColor: '#111',
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  card: {
+    width: CARD_SIZE,
+    height: CARD_SIZE * 1.3,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#fff',
+  },
   image: {
-    width: "100%",
-    height: "100%",
+    width: '100%',
+    height: '100%',
   },
 });
