@@ -1,23 +1,26 @@
 from dotenv import load_dotenv
 load_dotenv()
-from fastapi import FastAPI
-from fastapi import UploadFile, File, Form, Depends
+import os
+import uuid
+import requests
+
+from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
-import firebase_admin
-from firebase_admin import credentials, auth, initialize_app
 from verify import get_current_user
-import requests
-from savetoimgserver import store_image
-import base64
-import pyrebase
-import os
 
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
-from models import Image,Base
-import uuid
+from models import Image, Base
 
+import firebase_admin
+from firebase_admin import credentials, auth
+
+from savetoimgserver import store_image  # your image storage function
+
+# -------------------------
+# Database dependency
+# -------------------------
 def get_db():
     db = SessionLocal()
     try:
@@ -25,29 +28,64 @@ def get_db():
     finally:
         db.close()
 
-firebaseKey = "hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json"
-
-Base.metadata.create_all(bind=engine)
-#TODO: change this to env variable and add to gitignore
-cred = credentials.Certificate(firebaseKey)
+# -------------------------
+# Firebase Admin setup
+# -------------------------
+firebase_key = "hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json"
+cred = credentials.Certificate(firebase_key)
 firebase_admin.initialize_app(cred)
-
+custom_token = auth.create_custom_token("user-uid")
+print("CUSTOM: " ,custom_token)
+# -------------------------
+# FastAPI setup
+# -------------------------
 app = FastAPI()
 security = HTTPBearer()
 
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ 
 
+# -------------------------
+# Models
+# -------------------------
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
 
+# Create tables
+Base.metadata.create_all(bind=engine)
+# -------------------------
+# Helper: Firebase REST sign-in (for testing / Postman)
+# -------------------------
 
+# -------------------------
+# Helper: Firebase REST sign-in (for testing / Postman)
+# -------------------------
+FIREBASE_API_KEY = os.getenv("API_KEY")  # your Firebase Web API key
+
+def sign_in_user(email: str, password: str) -> str:
+    """Sign in a user via Firebase REST API and get a valid ID token"""
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
+    payload = {
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    }
+    resp = requests.post(url, json=payload)
+    resp.raise_for_status()
+    data = resp.json()
+    return data["idToken"]  # <-- this token works with Firebase Admin SDK
+
+# -------------------------
+# Dependency: get current user from token
+# -------------------------
+
+
+# -------------------------
+# Routes
+# -------------------------
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
-
-
 
 @app.post("/register")
 def register_user(request: RegisterRequest):
@@ -60,19 +98,12 @@ def register_user(request: RegisterRequest):
             "message": "User created successfully",
             "uid": user.uid
         }
-
     except Exception as e:
         return {
             "message": "Error creating user",
             "error": str(e)
         }
-    
 
-#TODO: implement token and bearer for protected routes
-    
-#protected routes
-
-#TODO: add feature to save to real DB 
 @app.post("/save-image")
 async def save_image(
     image: UploadFile = File(...),
@@ -82,6 +113,7 @@ async def save_image(
     uid = user["uid"]
 
     try:
+        # store image and get URL
         image_url = await store_image(image)
 
         new_image = Image(
@@ -98,15 +130,12 @@ async def save_image(
             "uid": uid,
             "image_url": image_url
         }
-
     except Exception as e:
         return {
             "message": "Error saving image",
             "error": str(e)
         }
 
-
-#wardrobe route to return all images for a user
 @app.get("/wardrobe")
 async def get_wardrobe(
     user=Depends(get_current_user),
@@ -123,13 +152,11 @@ async def get_wardrobe(
             "uid": uid,
             "images": image_urls
         }
-
     except Exception as e:
         return {
             "message": "Error retrieving wardrobe",
             "error": str(e)
         }
-    
 #generate outfit route to return generated outfit based on user images and gemnai prompt
 @app.post("/generate-outfit")
 async def generate_outfit(user = Depends(get_current_user), items: list[str] = Form(...)):

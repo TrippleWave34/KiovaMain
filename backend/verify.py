@@ -10,11 +10,11 @@ def get_current_user(
     try:
         print("TOKEN RECEIVED:", credentials.credentials)
         decoded_token = auth.verify_id_token(credentials.credentials)
-        print("DECODED OK:", decoded)
+        print("DECODED OK:", decoded_token)
         return decoded_token  # contains uid
-    except Exception:
+    except Exception as e:
+        print("TOKEN ERROR:", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
-    
