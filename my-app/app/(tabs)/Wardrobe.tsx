@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   Image,
   Dimensions,
   ScrollView,
@@ -33,7 +32,12 @@ type ClothingItem = {
 
 export default function WardrobeScreen() {
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [items, setItems] = useState<ClothingItem[]>([]);
+  const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
+  const [savedItems, setSavedItems] = useState<ClothingItem[]>([]);
+  const [view, setView] = useState<"wardrobe" | "saved">("wardrobe");
+
+  const isWardrobe = view === "wardrobe";
+  const items = isWardrobe ? wardrobeItems : savedItems;
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -52,7 +56,19 @@ export default function WardrobeScreen() {
         image: result.assets[0].uri,
         category: "Tops",
       };
-      setItems((prev) => [...prev, newItem]);
+      if (isWardrobe) {
+        setWardrobeItems((prev) => [...prev, newItem]);
+      } else {
+        setSavedItems((prev) => [...prev, newItem]);
+      }
+    }
+  };
+
+  const removeItem = (id: string) => {
+    if (isWardrobe) {
+      setWardrobeItems((prev) => prev.filter((i) => i.id !== id));
+    } else {
+      setSavedItems((prev) => prev.filter((i) => i.id !== id));
     }
   };
 
@@ -63,7 +79,6 @@ export default function WardrobeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Decorative blob — matches home page */}
       <View style={styles.blob1} />
       <View style={styles.blob2} />
 
@@ -94,15 +109,50 @@ export default function WardrobeScreen() {
       >
         {/* Title Row */}
         <View style={styles.titleRow}>
-          <Text style={styles.title}>{"Your\nwardrobe"}</Text>
-          <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
-            <Feather name="plus" size={16} color="white" />
-            <Text style={styles.blackButtonText}>Add item</Text>
-          </TouchableOpacity>
+          <Text style={styles.title}>
+            {isWardrobe ? "Your\nwardrobe" : "Saved\npieces"}
+          </Text>
+          <View style={styles.titleButtons}>
+            {/* Toggle button */}
+            <TouchableOpacity
+              style={[
+                styles.outlineButton,
+                !isWardrobe && styles.outlineButtonActive,
+              ]}
+              onPress={() => {
+                setView(isWardrobe ? "saved" : "wardrobe");
+                setSelectedCategory("All");
+              }}
+            >
+              <Feather
+                name={isWardrobe ? "bookmark" : "shopping-bag"}
+                size={15}
+                color={isWardrobe ? "#1a1a1a" : "white"}
+              />
+              <Text
+                style={[
+                  styles.outlineButtonText,
+                  !isWardrobe && styles.outlineButtonTextActive,
+                ]}
+              >
+                {isWardrobe ? "Saved" : "Wardrobe"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Add button */}
+            <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
+              <Feather name="plus" size={15} color="white" />
+              <Text style={styles.blackButtonText}>
+                {isWardrobe ? "Add item" : "Save item"}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.subtitle}>
-          All your clothing pieces, organised in one place.
+          {isWardrobe
+            ? "All your clothing pieces, organised in one place."
+            : "Pieces you saved from other clothing stores, use them to test outfits before you buy."}
         </Text>
 
         {/* Category Filters */}
@@ -133,32 +183,44 @@ export default function WardrobeScreen() {
           ))}
         </ScrollView>
 
-        
-
         {/* Grid or Empty State */}
         {filteredItems.length === 0 ? (
           <View style={styles.emptyState}>
             <View style={styles.emptyIconWrap}>
-              <Feather name="shopping-bag" size={28} color="#bbb" />
+              <Feather
+                name={isWardrobe ? "shopping-bag" : "bookmark"}
+                size={28}
+                color="#bbb"
+              />
             </View>
-            <Text style={styles.emptyTitle}>No items yet</Text>
+            <Text style={styles.emptyTitle}>
+              {isWardrobe ? "No items yet" : "Nothing saved yet"}
+            </Text>
             <Text style={styles.emptySub}>
-              Tap "Add item" to start building your wardrobe.
+              {isWardrobe
+                ? 'Tap "Add item" to start building your wardrobe.'
+                : "Save pieces from online stores to try them in outfits before you buy."}
             </Text>
             <TouchableOpacity style={styles.emptyButton} onPress={pickImage}>
               <Feather name="plus" size={16} color="white" />
-              <Text style={styles.emptyButtonText}>Add your first item</Text>
+              <Text style={styles.emptyButtonText}>
+                {isWardrobe ? "Add your first item" : "Save your first piece"}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.grid}>
             {filteredItems.map((item) => (
-              <View key={item.id} style={styles.card}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.card}
+                onLongPress={() => removeItem(item.id)}
+              >
                 <Image source={{ uri: item.image }} style={styles.image} />
                 <View style={styles.cardTag}>
                   <Text style={styles.cardTagText}>{item.category}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -170,28 +232,28 @@ export default function WardrobeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F3F0",  // ← exact home page background
+    backgroundColor: "#F5F3F0",
   },
 
   blob1: {
-    position: 'absolute',
+    position: "absolute",
     top: -60,
     right: -60,
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: '#F4C4C4',
+    backgroundColor: "#F4C4C4",
     opacity: 0.35,
   },
 
   blob2: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 100,
     left: -80,
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: '#D4C8F0',
+    backgroundColor: "#D4C8F0",
     opacity: 0.35,
   },
 
@@ -249,6 +311,40 @@ const styles = StyleSheet.create({
     lineHeight: 48,
   },
 
+  titleButtons: {
+    flexDirection: "column",
+    gap: 8,
+    marginBottom: 6,
+  },
+
+  outlineButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "transparent",
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    borderColor: "#1a1a1a",
+    gap: 6,
+    justifyContent: "center",
+  },
+
+  outlineButtonActive: {
+    backgroundColor: "#1a1a1a",
+    borderColor: "#1a1a1a",
+  },
+
+  outlineButtonText: {
+    color: "#1a1a1a",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  outlineButtonTextActive: {
+    color: "white",
+  },
+
   blackButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -257,7 +353,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 30,
     gap: 6,
-    marginBottom: 6,
+    justifyContent: "center",
   },
 
   blackButtonText: {
@@ -306,35 +402,6 @@ const styles = StyleSheet.create({
 
   activeFilterText: {
     color: "white",
-  },
-
-  savedCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "rgba(255,255,255,0.85)",
-    borderRadius: 18,
-    padding: 18,
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
-  },
-
-  savedCardLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  savedCardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
-
-  savedCardSub: {
-    fontSize: 13,
-    color: "#999",
-    marginTop: 2,
   },
 
   emptyState: {
