@@ -17,7 +17,7 @@ import firebase_admin
 from firebase_admin import credentials, auth
 
 from savetoimgserver import store_image  
-from GenImg import gen_img, save_image
+from GenImg import gen_img, save_image, save_image_locally
 
 
 # Database dependency
@@ -174,19 +174,19 @@ class OutfitRequest(BaseModel):
 @app.post("/generate-outfit")
 async def generate_outfit(
     request: OutfitRequest,
-    user: dict = Depends(get_current_user)
 ):
-    uid = user["uid"]
-
+    p = 0
     try:
-        images = request.items
 
         # Generate outfit image bytes
-        outfit_image_bytes = gen_img(images)
+        outfit_image_bytes = await gen_img(request.items)
+        p = 1
         print("TYPE OF outfit_image_bytes:", type(outfit_image_bytes))
+        p = 2
 
         # Save image to imgbb (sync call)
-        outfit_url = save_image(outfit_image_bytes)
+        outfit_url = save_image_locally(outfit_image_bytes)
+        p = 3
 
         return {
             "message": "Outfit generated",
@@ -196,5 +196,6 @@ async def generate_outfit(
     except Exception as e:
         return {
             "message": "Error generating outfit",
+            "p": p,
             "error": str(e)
         }
