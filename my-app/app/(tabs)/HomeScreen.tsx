@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
+import { Image } from 'react-native';
 
 const CATEGORIES = [
   { id: '1', label: 'All' },
@@ -25,7 +26,17 @@ const SLOT_COUNT = 6;
 
 export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('1');
-  const wardrobeIsEmpty = true;
+
+  // ✅ NEW: which wardrobe items to show
+  const [wardrobeSource, setWardrobeSource] = useState<'saved' | 'YourClothes'>('saved');
+
+  // ✅ NEW: placeholders for now (replace with your real data later)
+  const savedWardrobeItems: Array<{ id: string }> = [];
+  const YourClothesWardrobeItems: Array<{ id: string }> = [];
+
+  // ✅ NEW: compute active list + empty state from current source
+  const activeItems = wardrobeSource === 'saved' ? savedWardrobeItems : YourClothesWardrobeItems;
+  const wardrobeIsEmpty = activeItems.length === 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -46,8 +57,11 @@ export default function HomeScreen() {
             <Ionicons name="person-outline" size={20} color="#3B3B3B" />
           </TouchableOpacity>
           <View style={styles.logoWrapper}>
-            <Text style={styles.logoText}>Kiova</Text>
-            <Ionicons name="star" size={20} color="#4B0082" style={styles.logoStar} />
+            <Image
+              source={require('../../assets/images/logo.png')} 
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
           <TouchableOpacity style={styles.iconBtn}>
             <Ionicons name="notifications-outline" size={20} color="#3B3B3B" />
@@ -57,9 +71,21 @@ export default function HomeScreen() {
         {/* Heading + Your Clothes button */}
         <View style={styles.headingRow}>
           <Text style={styles.heading}>Craft your fit{'\n'}with Kiova</Text>
-          <TouchableOpacity style={styles.yourClothesBtn}>
-            <Ionicons name="bookmark" size={13} color="#fff" style={{ marginRight: 5 }} />
-            <Text style={styles.yourClothesText}>Your clothes</Text>
+
+          {/* ✅ UPDATED: toggles wardrobe source */}
+          <TouchableOpacity
+            style={styles.yourClothesBtn}
+            onPress={() => setWardrobeSource((prev) => (prev === 'saved' ? 'YourClothes' : 'saved'))}
+          >
+            <Ionicons
+              name={wardrobeSource === 'saved' ? 'bookmark' : 'shirt-outline'}
+              size={13}
+              color="#fff"
+              style={{ marginRight: 5 }}
+            />
+            <Text style={styles.yourClothesText}>
+              {wardrobeSource === 'saved' ? 'Saved' : 'Your Clothes'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -87,13 +113,23 @@ export default function HomeScreen() {
           {wardrobeIsEmpty ? (
             <View style={styles.emptyState}>
               <Ionicons name="information-circle-outline" size={28} color="#AAAAAA" />
-              <Text style={styles.emptyTitle}>Your wardrobe is empty</Text>
+              <Text style={styles.emptyTitle}>
+                {wardrobeSource === 'saved'
+                  ? 'Your saved wardrobe is empty'
+                  : 'Your wardrobe is empty'}
+              </Text>
               <Text style={styles.emptySubtitle}>
-                Go to Wardrobe and add some clothes. Then come back to pick them here.
+                {wardrobeSource === 'saved'
+                  ? 'Save/import clothes first. Then come back to pick them here.'
+                  : 'Add clothes in your wardrobe first. Then come back to pick them here.'}
               </Text>
             </View>
           ) : (
-            <Text style={styles.emptyTitle}>Your clothes will appear here</Text>
+            <View style={styles.itemsGrid}>
+              {activeItems.map((item) => (
+                <View key={item.id} style={styles.itemCard} />
+              ))}
+            </View>
           )}
         </View>
 
@@ -268,6 +304,22 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     maxWidth: 260,
   },
+
+  itemsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  itemCard: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+
   generatorSection: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -300,7 +352,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.6)',
   },
   previewBox: {
-    height: 220,
+    height: 460,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.6)',
     alignItems: 'center',
@@ -326,5 +378,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 15,
     fontWeight: '700',
+  },
+  logoImage: {
+  width: 120,
+  height: 40,
   },
 });
