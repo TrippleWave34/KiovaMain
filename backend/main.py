@@ -23,14 +23,10 @@ from savetoimgserver import store_image
 from GenImg import gen_img, save_image, save_image_locally
 
 
-<<<<<<< HEAD
-=======
+
 # ✅ NEW: Stripe
 import stripe
 
-
-# -------------------------
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
 # Database dependency
 
 def get_db():
@@ -40,19 +36,15 @@ def get_db():
     finally:
         db.close()
 
-<<<<<<< HEAD
-=======
 
-# -------------------------
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
 # Firebase Admin setup
 
 firebase_key = "hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json"
 cred = credentials.Certificate(firebase_key)
-<<<<<<< HEAD
+
 firebase_admin.initialize_app(cred)
 
-=======
+
 
 # Avoid re-init error if app reloads (uvicorn --reload)
 if not firebase_admin._apps:
@@ -61,16 +53,12 @@ if not firebase_admin._apps:
 custom_token = auth.create_custom_token("user-uid")
 print("CUSTOM: ", custom_token)
 
-
-# -------------------------
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
 # FastAPI setup
 
 app = FastAPI()
 security = HTTPBearer()
 
-<<<<<<< HEAD
-=======
+
 # ✅ NEW: CORS (important for Expo / mobile)
 app.add_middleware(
     CORSMiddleware,
@@ -80,7 +68,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
 
 # Models
 
@@ -91,16 +78,12 @@ class RegisterRequest(BaseModel):
 
 # Create tables
 Base.metadata.create_all(bind=engine)
-<<<<<<< HEAD
-=======
 
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
 
 
 FIREBASE_API_KEY = os.getenv("API_KEY")  # your Firebase Web API key
 
-<<<<<<< HEAD
-=======
+
 
 def sign_in_user(email: str, password: str) -> str:
     """Sign in a user via Firebase REST API and get a valid ID token"""
@@ -126,8 +109,7 @@ SUCCESS_URL = os.getenv("FRONTEND_SUCCESS_URL", "https://example.com/success")
 CANCEL_URL = os.getenv("FRONTEND_CANCEL_URL", "https://example.com/cancel")
 
 
-# -------------------------
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
+
 # Routes
 
 @app.get("/")
@@ -153,39 +135,7 @@ def register_user(request: RegisterRequest):
         }
 
 
-@app.post("/save-image")
-async def save_image(
-    image: UploadFile = File(...),
-    user=Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    uid = user["uid"]
 
-    try:
-        # store image and get URL
-        image_url = await store_image(image)
-
-        new_image = Image(
-            id=str(uuid.uuid4()),
-            uid=uid,
-            image_url=image_url
-        )
-
-        db.add(new_image)
-        db.commit()
-
-        return {
-            "message": "Image saved",
-            "uid": uid,
-            "image_url": image_url
-        }
-    except Exception as e:
-        return {
-            "message": "Error saving image",
-            "error": str(e)
-        }
-
-<<<<<<< HEAD
 #TODO: Remove overlap between save-image and save-favourite, maybe merge into one route with a "favourite" flag in the request body?
 @app.post("/save-favourite")
 async def save_favourite(
@@ -218,8 +168,7 @@ async def save_favourite(
             "message": "Error saving favourite image",
             "error": str(e)
         }
-=======
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
+
 
 @app.get("/wardrobe")
 async def get_wardrobe(
@@ -245,9 +194,9 @@ async def get_wardrobe(
             "message": "Error retrieving wardrobe",
             "error": str(e)
         }
-<<<<<<< HEAD
-#generate outfit route to return generated outfit based on user images and gemnai prompt
 
+
+# generate outfit route to return generated outfit based on user images and gemnai prompt
 class OutfitRequest(BaseModel):
     items: list[str]
 
@@ -280,14 +229,6 @@ async def generate_outfit(
             "p": p,
             "error": str(e)
         }
-=======
-
-
-# generate outfit route to return generated outfit based on user images and gemnai prompt
-@app.post("/generate-outfit")
-async def generate_outfit(user=Depends(get_current_user), items: list[str] = Form(...)):
-    uid = user["uid"]
-    return ""
 
 
 # -------------------------
@@ -425,4 +366,4 @@ async def create_checkout_session_plan(body: PlanCheckoutRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 # TODO: get azure database connection
->>>>>>> d497dfb42bf1698772d84322aa646d8f3791fd92
+
