@@ -10,17 +10,18 @@ from pydantic import BaseModel, EmailStr
 from verify import get_current_user
 
 from sqlalchemy.orm import Session
-from database import SessionLocal, engine
-from models import Image, Base
+from database import SessionLocal, engine,Base
+from models import Image, FavouriteImage
 
 import firebase_admin
 from firebase_admin import credentials, auth
 
 from savetoimgserver import store_image  
+from GenImg import gen_img, save_image
 
-# -------------------------
+
 # Database dependency
-# -------------------------
+
 def get_db():
     db = SessionLocal()
     try:
@@ -28,42 +29,32 @@ def get_db():
     finally:
         db.close()
 
-# -------------------------
 # Firebase Admin setup
-# -------------------------
+
 firebase_key = "hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json"
 cred = credentials.Certificate(firebase_key)
 firebase_admin.initialize_app(cred)
 
-# -------------------------
 # FastAPI setup
-# -------------------------
+
 app = FastAPI()
 security = HTTPBearer()
 
 
-# -------------------------
 # Models
-# -------------------------
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
 
 # Create tables
 Base.metadata.create_all(bind=engine)
-# -------------------------
-# Helper: Firebase REST sign-in (for testing / Postman)
-# -------------------------
 
-# -------------------------
-# Helper: Firebase REST sign-in (for testing / Postman)
-# -------------------------
+
 FIREBASE_API_KEY = os.getenv("API_KEY")  # your Firebase Web API key
 
-
-# -------------------------
 # Routes
-# -------------------------
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
@@ -117,6 +108,39 @@ async def save_image(
             "error": str(e)
         }
 
+#TODO: Remove overlap between save-image and save-favourite, maybe merge into one route with a "favourite" flag in the request body?
+@app.post("/save-favourite")
+async def save_favourite(
+    image: UploadFile = File(...),
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    uid = user["uid"]
+
+    try:
+        # store image and get URL
+        image_url = await store_image(image)
+
+        new_fav_image = FavouriteImage(
+            id=str(uuid.uuid4()),
+            uid=uid,
+            image_url=image_url
+        )
+
+        db.add(new_fav_image)
+        db.commit()
+
+        return {
+            "message": "Favourite image saved",
+            "uid": uid,
+            "image_url": image_url
+        }
+    except Exception as e:
+        return {
+            "message": "Error saving favourite image",
+            "error": str(e)
+        }
+
 @app.get("/wardrobe")
 async def get_wardrobe(
     user=Depends(get_current_user),
@@ -126,12 +150,15 @@ async def get_wardrobe(
 
     try:
         images = db.query(Image).filter(Image.uid == uid).all()
+        favimages = db.query(FavouriteImage).filter(FavouriteImage.uid == uid).all()
         image_urls = [img.image_url for img in images]
+        favimages_urls = [img.image_url for img in favimages]
 
         return {
             "message": "Wardrobe retrieved",
             "uid": uid,
-            "images": image_urls
+            "images": image_urls,
+            "favourites": favimages_urls
         }
     except Exception as e:
         return {
@@ -139,10 +166,35 @@ async def get_wardrobe(
             "error": str(e)
         }
 #generate outfit route to return generated outfit based on user images and gemnai prompt
+
+class OutfitRequest(BaseModel):
+    items: list[str]
+
+#add the image urls in a file that you want to combine
 @app.post("/generate-outfit")
-async def generate_outfit(user = Depends(get_current_user), items: list[str] = Form(...)):
+async def generate_outfit(
+    request: OutfitRequest,
+    user: dict = Depends(get_current_user)
+):
     uid = user["uid"]
 
-    return ""
+    try:
+        images = request.items
 
+        # Generate outfit image bytes
+        outfit_image_bytes = gen_img(images)
+        print("TYPE OF outfit_image_bytes:", type(outfit_image_bytes))
 
+        # Save image to imgbb (sync call)
+        outfit_url = save_image(outfit_image_bytes)
+
+        return {
+            "message": "Outfit generated",
+            "outfit_url": outfit_url
+        }
+
+    except Exception as e:
+        return {
+            "message": "Error generating outfit",
+            "error": str(e)
+        }
