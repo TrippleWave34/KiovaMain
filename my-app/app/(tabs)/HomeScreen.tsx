@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Image } from 'react-native';
+import TokenModal from '../payment';
 
 const CATEGORIES = [
   { id: '1', label: 'All' },
@@ -21,20 +22,16 @@ const CATEGORIES = [
   { id: '7', label: 'Shoes' },
   { id: '8', label: 'Accessories' },
 ];
-
 const SLOT_COUNT = 6;
 
 export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('1');
-
-  // ✅ NEW: which wardrobe items to show
   const [wardrobeSource, setWardrobeSource] = useState<'saved' | 'YourClothes'>('saved');
+  const [showTokens, setShowTokens] = useState(false); // ← token modal state
 
-  // ✅ NEW: placeholders for now (replace with your real data later)
   const savedWardrobeItems: Array<{ id: string }> = [];
   const YourClothesWardrobeItems: Array<{ id: string }> = [];
 
-  // ✅ NEW: compute active list + empty state from current source
   const activeItems = wardrobeSource === 'saved' ? savedWardrobeItems : YourClothesWardrobeItems;
   const wardrobeIsEmpty = activeItems.length === 0;
 
@@ -53,16 +50,23 @@ export default function HomeScreen() {
       >
         {/* Top bar */}
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.iconBtn}>
+
+          {/* ← Person icon now opens token modal */}
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => setShowTokens(true)}
+          >
             <Ionicons name="person-outline" size={20} color="#3B3B3B" />
           </TouchableOpacity>
+
           <View style={styles.logoWrapper}>
             <Image
-              source={require('../../assets/images/logo.png')} 
+              source={require('../../assets/images/logo.png')}
               style={styles.logoImage}
               resizeMode="contain"
             />
           </View>
+
           <TouchableOpacity style={styles.iconBtn}>
             <Ionicons name="notifications-outline" size={20} color="#3B3B3B" />
           </TouchableOpacity>
@@ -72,7 +76,6 @@ export default function HomeScreen() {
         <View style={styles.headingRow}>
           <Text style={styles.heading}>Craft your fit{'\n'}with Kiova</Text>
 
-          {/* ✅ UPDATED: toggles wardrobe source */}
           <TouchableOpacity
             style={styles.yourClothesBtn}
             onPress={() => setWardrobeSource((prev) => (prev === 'saved' ? 'YourClothes' : 'saved'))}
@@ -159,6 +162,10 @@ export default function HomeScreen() {
 
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* ← Token modal sits outside ScrollView so it overlays everything */}
+      <TokenModal visible={showTokens} onClose={() => setShowTokens(false)} />
+
     </SafeAreaView>
   );
 }
@@ -209,17 +216,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
-  },
-  logoText: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#F5A623',
-    letterSpacing: 0.5,
-  },
-  logoStar: {
-    position: 'absolute',
-    top: -10,
-    left: 18,
   },
   headingRow: {
     flexDirection: 'row',
@@ -304,7 +300,6 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     maxWidth: 260,
   },
-
   itemsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -319,7 +314,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.06)',
   },
-
   generatorSection: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -380,7 +374,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   logoImage: {
-  width: 120,
-  height: 40,
+    width: 120,
+    height: 40,
   },
 });
