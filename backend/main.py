@@ -12,11 +12,22 @@ from savetoimgserver import store_image
 import base64
 import pyrebase
 import os
+
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine
+from models import Image,Base
 import uuid
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 firebaseKey = "hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json"
 
-
+Base.metadata.create_all(bind=engine)
 #TODO: change this to env variable and add to gitignore
 cred = credentials.Certificate(firebaseKey)
 firebase_admin.initialize_app(cred)
@@ -31,13 +42,6 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
 
-
-fake_db = {}  
-# Structure:
-# {
-#   "uid123": ["image_url1", "image_url2"],
-#   "uid456": ["image_url3"]
-# }
 
 @app.get("/")
 def read_root():
@@ -62,6 +66,7 @@ def register_user(request: RegisterRequest):
             "message": "Error creating user",
             "error": str(e)
         }
+    
 
 #TODO: implement token and bearer for protected routes
     
@@ -71,19 +76,22 @@ def register_user(request: RegisterRequest):
 @app.post("/save-image")
 async def save_image(
     image: UploadFile = File(...),
-    user=Depends(get_current_user)
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     uid = user["uid"]
 
     try:
-        # Store image somewhere (your function)
         image_url = await store_image(image)
 
-        # Save to fake DB
-        if uid not in fake_db:
-            fake_db[uid] = []
+        new_image = Image(
+            id=str(uuid.uuid4()),
+            uid=uid,
+            image_url=image_url
+        )
 
-        fake_db[uid].append(image_url)
+        db.add(new_image)
+        db.commit()
 
         return {
             "message": "Image saved",
@@ -100,15 +108,20 @@ async def save_image(
 
 #wardrobe route to return all images for a user
 @app.get("/wardrobe")
-async def get_wardrobe(user=Depends(get_current_user)):
+async def get_wardrobe(
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     uid = user["uid"]
 
     try:
-        images =list( fake_db.get(uid, []))
+        images = db.query(Image).filter(Image.uid == uid).all()
+        image_urls = [img.image_url for img in images]
+
         return {
             "message": "Wardrobe retrieved",
             "uid": uid,
-            "images": images
+            "images": image_urls
         }
 
     except Exception as e:
@@ -116,7 +129,7 @@ async def get_wardrobe(user=Depends(get_current_user)):
             "message": "Error retrieving wardrobe",
             "error": str(e)
         }
-
+    
 #generate outfit route to return generated outfit based on user images and gemnai prompt
 @app.post("/generate-outfit")
 async def generate_outfit(user = Depends(get_current_user), items: list[str] = Form(...)):
