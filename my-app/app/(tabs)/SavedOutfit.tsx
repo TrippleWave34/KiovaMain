@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    marginTop: 35,
+    marginTop: 2,
     gap: 12,
   },
   outfitImageText: { fontSize: 14, color: '#AAAAAA' },
