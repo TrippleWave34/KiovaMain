@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,225 +6,290 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  SafeAreaView,
-  ScrollView,
   Dimensions,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
+  ScrollView,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 
-const { width } = Dimensions.get('window');
-const CARD_SIZE = (width - 40) / 2;
+const { width } = Dimensions.get("window");
 
-const CATEGORIES = ['All', 'Tops', 'Bottoms', 'Outerwear', 'Dresses', 'Shoes'];
+const CATEGORIES = [
+  { id: "1", label: "All" },
+  { id: "2", label: "Tops" },
+  { id: "3", label: "Bottoms" },
+  { id: "4", label: "Outerwear" },
+  { id: "5", label: "Dresses" },
+  { id: "6", label: "Activewear" },
+  { id: "7", label: "Shoes" },
+  { id: "8", label: "Accessories" },
+];
 
 type ClothingItem = {
   id: string;
-  uri: string;
+  image: string;
   category: string;
 };
 
-export default function Wardrobe() {
+export default function WardrobeScreen() {
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [items, setItems] = useState<ClothingItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [loading, setLoading] = useState(false);
 
-  const filtered =
-    selectedCategory === 'All'
-      ? items
-      : items.filter((item) => item.category === selectedCategory);
-
-  const pickImage = useCallback(async () => {
-    const { status } =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Allow gallery access.');
-      return;
-    }
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      allowsEditing: true,
+      aspect: [4, 5],
+      quality: 1,
     });
 
-    if (result.canceled) return;
+    if (!result.canceled) {
+      const newItem: ClothingItem = {
+        id: Date.now().toString(),
+        image: result.assets[0].uri,
+        category: "Tops",
+      };
+      setItems((prev) => [...prev, newItem]);
+    }
+  };
 
-    const image = result.assets[0];
-
-    Alert.alert('Select Category', '', [
-      ...CATEGORIES.filter((c) => c !== 'All').map((cat) => ({
-        text: cat,
-        onPress: () => {
-          const newItem = {
-            id: Date.now().toString(),
-            uri: image.uri,
-            category: cat,
-          };
-
-          setItems((prev) => [...prev, newItem]);
-        },
-      })),
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, []);
-
-  const renderItem = ({ item }: { item: ClothingItem }) => (
-    <View style={styles.card}>
-      <Image source={{ uri: item.uri }} style={styles.image} />
-    </View>
-  );
+  const filteredItems =
+    selectedCategory === "All"
+      ? items
+      : items.filter((item) => item.category === selectedCategory);
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <LinearGradient
-        colors={['#F8F5FF', '#F9F2F5', '#F5F8FF']}
-        style={StyleSheet.absoluteFill}
-      />
+    <LinearGradient
+      colors={["#f8d7e3", "#e8d5f0", "#d5e8f8", "#f0e6d8"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
+      {/* Top Header */}
+      <View style={styles.topBar}>
+        {/* Person icon in circle */}
+        <TouchableOpacity style={styles.iconCircle}>
+          <Ionicons name="person-outline" size={22} color="#555" />
+        </TouchableOpacity>
 
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Your wardrobe</Text>
-          <Text style={styles.subtitle}>
-            Add items and organize your looks.
-          </Text>
+        {/* Logo with sparkle */}
+        <View style={styles.logoContainer}>
+          <Ionicons
+            name="sparkles"
+            size={18}
+            color="#6B4EFF"
+            style={styles.sparkle}
+          />
+          <Text style={styles.logo}>Kiova</Text>
         </View>
 
+        {/* Bell icon in circle */}
+        <TouchableOpacity style={styles.iconCircle}>
+          <Ionicons name="notifications-outline" size={22} color="#555" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Title row with buttons */}
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>{"Your wa\nrdrobe"}</Text>
+
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.savedBtn}>
-            <Ionicons name="bookmark" size={16} color="#fff" />
-            <Text style={styles.btnText}>Saved</Text>
+          <TouchableOpacity style={styles.blackButton}>
+            <Feather name="bookmark" size={16} color="white" />
+            <Text style={styles.blackButtonText}>Saved</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={pickImage}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="add" size={16} color="#fff" />
-                <Text style={styles.btnText}>Add</Text>
-              </>
-            )}
+          <TouchableOpacity style={styles.blackButton} onPress={pickImage}>
+            <Feather name="plus" size={16} color="white" />
+            <Text style={styles.blackButtonText}>Add</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* CATEGORY FILTER */}
+      {/* Subtitle */}
+      <Text style={styles.subtitle}>
+        All your pieces live here. Add items, filter by category,{"\n"}
+        and build outfits faster.
+      </Text>
+
+      {/* Category Filters - horizontal scroll */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ marginTop: 10 }}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterRow}
       >
         {CATEGORIES.map((cat) => (
           <TouchableOpacity
-            key={cat}
+            key={cat.id}
+            onPress={() => setSelectedCategory(cat.label)}
             style={[
-              styles.pill,
-              selectedCategory === cat && styles.activePill,
+              styles.filterButton,
+              selectedCategory === cat.label && styles.activeFilter,
             ]}
-            onPress={() => setSelectedCategory(cat)}
           >
             <Text
               style={[
-                styles.pillText,
-                selectedCategory === cat && { color: '#fff' },
+                styles.filterText,
+                selectedCategory === cat.label && styles.activeFilterText,
               ]}
             >
-              {cat}
+              {cat.label}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* GRID */}
+      {/* Clothing Grid */}
       <FlatList
-        data={filtered}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        data={filteredItems}
         numColumns={2}
-        contentContainerStyle={{ padding: 16 }}
-        columnWrapperStyle={{ justifyContent: 'space-between' }}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 40, paddingTop: 10 }}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Image source={{ uri: item.image }} style={styles.image} />
+          </View>
+        )}
       />
-    </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
-  title: {
+
+  topBar: {
+    marginTop: 60,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  iconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  logoContainer: {
+    alignItems: "center",
+  },
+
+  sparkle: {
+    marginBottom: -4,
+    alignSelf: "center",
+  },
+
+  logo: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#111',
+    fontWeight: "800",
+    color: "#F4A261",
+    letterSpacing: 1,
   },
-  subtitle: {
-    fontSize: 13,
-    color: '#777',
+
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginTop: 30,
+  },
+
+  title: {
+    fontSize: 44,
+    fontWeight: "900",
+    color: "black",
+    lineHeight: 50,
+    flex: 1,
+  },
+
+  headerButtons: {
+    flexDirection: "column",
+    gap: 10,
     marginTop: 4,
   },
-  headerButtons: {
-    flexDirection: 'row',
+
+  blackButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1a1a1a",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 30,
+    gap: 6,
+    minWidth: 110,
+    justifyContent: "center",
+  },
+
+  blackButtonText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+
+  subtitle: {
+    marginTop: 16,
+    color: "#555",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  filterScroll: {
+    marginTop: 24,
+    flexGrow: 0,
+  },
+
+  filterRow: {
+    flexDirection: "row",
     gap: 10,
-    alignItems: 'center',
+    paddingRight: 20,
   },
-  savedBtn: {
-    flexDirection: 'row',
-    backgroundColor: '#111',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignItems: 'center',
-    gap: 6,
+
+  filterButton: {
+    backgroundColor: "rgba(255,255,255,0.75)",
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.9)",
   },
-  addBtn: {
-    flexDirection: 'row',
-    backgroundColor: '#111',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignItems: 'center',
-    gap: 6,
+
+  activeFilter: {
+    backgroundColor: "#1a1a1a",
+    borderColor: "#1a1a1a",
   },
-  btnText: {
-    color: '#fff',
-    fontWeight: '600',
+
+  filterText: {
+    fontWeight: "600",
+    color: "#333",
+    fontSize: 15,
   },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#EAEAEA',
-    borderRadius: 20,
-    marginRight: 8,
+
+  activeFilterText: {
+    color: "white",
   },
-  activePill: {
-    backgroundColor: '#111',
-  },
-  pillText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
+
   card: {
-    width: CARD_SIZE,
-    height: CARD_SIZE * 1.3,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#fff',
+    width: width / 2 - 30,
+    height: 200,
+    backgroundColor: "rgba(255,255,255,0.7)",
+    borderRadius: 20,
+    margin: 10,
+    overflow: "hidden",
   },
+
   image: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
 });
