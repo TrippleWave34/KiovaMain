@@ -24,6 +24,7 @@ type SavedOutfitItem = {
   image: string;
   createdAt: number;
   name?: string;
+  items?: string[];
 };
 
 type Outfit = {
@@ -73,12 +74,11 @@ export default function SavedOutfit() {
             image: x.image,
             createdAt,
             date: formatDate(createdAt),
-            items: [],
+            items: Array.isArray(x.items) ? x.items : [],
           };
         });
 
       setOutfits(mapped);
-
       setCurrentIndex((prev) => {
         if (mapped.length === 0) return 0;
         return Math.min(prev, mapped.length - 1);
@@ -97,8 +97,8 @@ export default function SavedOutfit() {
         image: o.image,
         createdAt: o.createdAt,
         name: o.name,
+        items: o.items,
       }));
-
       await AsyncStorage.setItem(SAVED_OUTFITS_KEY, JSON.stringify(toStore));
     } catch (e) {
       console.log('SavedOutfit persist error:', e);
@@ -134,16 +134,13 @@ export default function SavedOutfit() {
   const deleteOutfit = () => {
     setOutfits((prev) => {
       const updated = prev.filter((_, i) => i !== currentIndex);
-
       const newIndex = Math.min(currentIndex, updated.length - 1);
       setCurrentIndex(newIndex < 0 ? 0 : newIndex);
-
       setTimeout(() => {
         if (updated.length > 0 && newIndex >= 0) {
           flatListRef.current?.scrollToIndex({ index: newIndex, animated: false });
         }
       }, 100);
-
       persistOutfits(updated);
       return updated;
     });
@@ -199,6 +196,15 @@ export default function SavedOutfit() {
           <View style={styles.page}>
             <View style={styles.outfitImage}>
               <Image source={{ uri: item.image }} style={styles.outfitImgActual} resizeMode="contain" />
+
+              {/* Item thumbnails — vertical stack on top-left */}
+              {item.items.length > 0 && (
+                <View style={styles.itemsStack}>
+                  {item.items.slice(0, 6).map((url, i) => (
+                    <Image key={i} source={{ uri: url }} style={styles.itemThumb} resizeMode="cover" />
+                  ))}
+                </View>
+              )}
             </View>
 
             <View style={styles.infoCard}>
@@ -253,132 +259,81 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F5F3F0' },
 
   blobTopRight: {
-    position: 'absolute',
-    top: -60,
-    right: -60,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: '#F4C4C4',
-    opacity: 0.35,
+    position: 'absolute', top: -60, right: -60, width: 250, height: 250,
+    borderRadius: 125, backgroundColor: '#F4C4C4', opacity: 0.35,
   },
   blobBottomLeft: {
-    position: 'absolute',
-    bottom: 100,
-    left: -80,
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: '#D4C8F0',
-    opacity: 0.35,
+    position: 'absolute', bottom: 100, left: -80, width: 240, height: 240,
+    borderRadius: 120, backgroundColor: '#D4C8F0', opacity: 0.35,
   },
 
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    marginBottom: 10,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    paddingHorizontal: 24, paddingTop: 16, marginBottom: 10,
   },
-  title: { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
+  title:    { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
   subtitle: { fontSize: 13, color: '#888', marginTop: 4 },
-  badge: {
-    backgroundColor: '#F0EDFF',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
+  badge:    { backgroundColor: '#F0EDFF', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
   badgeText: { fontSize: 12, fontWeight: '700', color: '#6B4EFF', letterSpacing: 1 },
 
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 12 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D0CCE8' },
+  dots:      { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 12 },
+  dot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D0CCE8' },
   dotActive: { width: 20, backgroundColor: '#6B4EFF' },
 
   page: { width, paddingHorizontal: 40, paddingBottom: 110 },
 
   outfitImage: {
-    width: '100%',
-    height: height * 0.52,
-    borderRadius: 28,
-    backgroundColor: '#EEECEA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    marginTop: 2,
-    overflow: 'hidden',
+    width: '100%', height: height * 0.52, borderRadius: 28,
+    backgroundColor: '#EEECEA', marginBottom: 12, marginTop: 2, overflow: 'hidden',
   },
   outfitImgActual: { width: '100%', height: '100%' },
+
+  // Vertical stack of item thumbnails on top-left
+  itemsStack: {
+    position: 'absolute', top: 12, left: 12,
+    flexDirection: 'column', gap: 5,
+  },
+  itemThumb: {
+    width: 38, height: 38, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.9)',
+  },
 
   infoCard: { backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 20, padding: 12 },
 
   nameRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    flexDirection: 'row', alignItems: 'flex-start',
+    justifyContent: 'space-between', marginBottom: 10,
   },
   outfitName: { fontSize: 15, fontWeight: '800', color: '#1A1A1A' },
   outfitDate: { fontSize: 11, color: '#888', marginTop: 1 },
 
   renameBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F0EDFF',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#F0EDFF', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
   },
   renameBtnText: { fontSize: 12, fontWeight: '700', color: '#6B4EFF' },
 
   deleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: 50,
-    backgroundColor: '#FFE5E5',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 9, borderRadius: 50, backgroundColor: '#FFE5E5',
   },
   deleteBtnText: { fontSize: 12, fontWeight: '700', color: '#FF3B30' },
 
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#444', marginTop: 16, marginBottom: 8 },
+  emptyState:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  emptyTitle:    { fontSize: 18, fontWeight: '700', color: '#444', marginTop: 16, marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalBox: { width: '80%', backgroundColor: '#fff', borderRadius: 24, padding: 24 },
-  modalTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
-  modalInput: {
-    backgroundColor: '#F5F3F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#1A1A1A',
-    marginBottom: 16,
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
+  modalBox:     { width: '80%', backgroundColor: '#fff', borderRadius: 24, padding: 24 },
+  modalTitle:   { fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 16 },
+  modalInput:   {
+    backgroundColor: '#F5F3F0', borderRadius: 12, paddingHorizontal: 14,
+    paddingVertical: 12, fontSize: 15, color: '#1A1A1A', marginBottom: 16,
   },
   modalButtons: { flexDirection: 'row', gap: 10 },
-  modalCancel: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 50,
-    backgroundColor: '#F0EDFF',
-    alignItems: 'center',
-  },
+  modalCancel:  { flex: 1, paddingVertical: 12, borderRadius: 50, backgroundColor: '#F0EDFF', alignItems: 'center' },
   modalCancelText: { fontWeight: '700', color: '#6B4EFF' },
-  modalSave: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 50,
-    backgroundColor: '#1A1A1A',
-    alignItems: 'center',
-  },
+  modalSave:    { flex: 1, paddingVertical: 12, borderRadius: 50, backgroundColor: '#1A1A1A', alignItems: 'center' },
   modalSaveText: { fontWeight: '700', color: '#fff' },
 });
