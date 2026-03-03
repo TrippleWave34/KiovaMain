@@ -20,7 +20,7 @@ import firebase_admin
 from firebase_admin import credentials, auth
 
 from savetoimgserver import store_image  
-from GenImg import gen_img, save_image, save_image_locally
+from GenImg import gen_img, save_image_locally
 
 
 
@@ -172,9 +172,20 @@ async def save_favourite(
 @app.post("/save-image")
 async def save_image_route(
     image: UploadFile = File(...),
-    user=Depends(get_current_user),
-    db: Session = Depends(get_db)
 ):
+    try:
+        # store image and get URL
+        image_url = await store_image(image)
+
+        return {
+            "message": "Image saved",
+            "image_url": image_url
+        }
+    except Exception as e:
+        return {
+            "message": "Error saving image",
+            "error": str(e)
+        }
     uid = user["uid"]
 
     try:

@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -14,7 +15,7 @@ import { Image } from 'react-native';
 import TokenModal from '../payment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BACKEND_URL = 'http://10.0.2.2:8001'; // <-- change si besoin
+const BACKEND_URL = 'http://10.1.24.78:8001'; // emulator Android. Sur tel: IP de ton PC
 
 const CATEGORIES = [
   { id: '1', label: 'All' },
@@ -26,61 +27,62 @@ const CATEGORIES = [
   { id: '7', label: 'Shoes' },
   { id: '8', label: 'Accessories' },
 ];
+
 const SLOT_COUNT = 6;
 
 type ClothingItem = {
   id: string;
+  image: string; // URL http(s)
+  category: string; // "Tops", "Bottoms", etc.
+};
+
+type SavedOutfitItem = {
+  id: string;
   image: string;
-  category: string;
+  createdAt: number;
+  name?: string;
 };
 
 const WARDROBE_KEY = 'kiova:wardrobe_items';
+const SAVED_OUTFITS_KEY = 'kiova:saved_outfits';
 
 export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('1');
-  const [wardrobeSource, setWardrobeSource] = useState<'saved' | 'YourClothes'>('saved');
-  const [showTokens, setShowTokens] = useState(false); // ← token modal state
+  const [showTokens, setShowTokens] = useState(false);
 
-  const [YourClothesWardrobeItems, setYourClothesWardrobeItems] = useState<ClothingItem[]>([]);
-  const savedWardrobeItems: ClothingItem[] = [];
+  const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
 
-  // ✅ selected items (max SLOT_COUNT)
   const [selectedItems, setSelectedItems] = useState<ClothingItem[]>([]);
-
-  // ✅ generated outfit preview
   const [generating, setGenerating] = useState(false);
   const [generatedOutfitUrl, setGeneratedOutfitUrl] = useState<string | null>(null);
 
+  // Load wardrobe from AsyncStorage
   useEffect(() => {
     const load = async () => {
       try {
         const raw = await AsyncStorage.getItem(WARDROBE_KEY);
         const items = raw ? (JSON.parse(raw) as ClothingItem[]) : [];
-        setYourClothesWardrobeItems(Array.isArray(items) ? items : []);
+        setWardrobeItems(Array.isArray(items) ? items : []);
       } catch (e) {
         console.log('HomeScreen load wardrobe error:', e);
-        setYourClothesWardrobeItems([]);
+        setWardrobeItems([]);
       }
     };
 
     load();
-
     const interval = setInterval(load, 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const activeItemsRaw = wardrobeSource === 'saved' ? savedWardrobeItems : YourClothesWardrobeItems;
-
-  // ✅ simple category filter (matches item.category strings like "Tops")
   const activeCategoryLabel = useMemo(() => {
     const found = CATEGORIES.find((c) => c.id === activeCategory);
     return found?.label ?? 'All';
   }, [activeCategory]);
 
   const activeItems = useMemo(() => {
-    if (activeCategoryLabel === 'All') return activeItemsRaw;
-    return activeItemsRaw.filter((it) => it.category === activeCategoryLabel);
-  }, [activeItemsRaw, activeCategoryLabel]);
+    if (activeCategoryLabel === 'All') return wardrobeItems;
+    return wardrobeItems.filter((it) => it.category === activeCategoryLabel);
+  }, [wardrobeItems, activeCategoryLabel]);
 
   const wardrobeIsEmpty = activeItems.length === 0;
 
@@ -89,20 +91,33 @@ export default function HomeScreen() {
   const toggleSelect = (item: ClothingItem) => {
     setSelectedItems((prev) => {
       const exists = prev.some((s) => s.id === item.id);
-      if (exists) {
-        return prev.filter((s) => s.id !== item.id);
-      }
-      if (prev.length >= SLOT_COUNT) return prev; // max
+      if (exists) return prev.filter((s) => s.id !== item.id);
+      if (prev.length >= SLOT_COUNT) return prev;
       return [...prev, item];
     });
-
-    // option : reset preview when selection changes
     setGeneratedOutfitUrl(null);
   };
 
   const removeSelectedById = (id: string) => {
     setSelectedItems((prev) => prev.filter((s) => s.id !== id));
     setGeneratedOutfitUrl(null);
+  };
+
+  const appendSavedOutfit = async (url: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(SAVED_OUTFITS_KEY);
+      const prev = raw ? (JSON.parse(raw) as SavedOutfitItem[]) : [];
+      const safePrev = Array.isArray(prev) ? prev : [];
+
+      const already = safePrev.some((x) => x?.image === url);
+      const next: SavedOutfitItem[] = already
+        ? safePrev
+        : [{ id: Date.now().toString(), image: url, createdAt: Date.now() }, ...safePrev];
+
+      await AsyncStorage.setItem(SAVED_OUTFITS_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.log('HomeScreen save saved_outfits error:', e);
+    }
   };
 
   const handleGenerate = async () => {
@@ -116,26 +131,28 @@ export default function HomeScreen() {
       const res = await fetch(`${BACKEND_URL}/generate-outfit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: selectedItems.map((s) => s.image),
-        }),
+        body: JSON.stringify({ items: selectedItems.map((s) => s.image) }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         console.log('generate error:', data);
+        Alert.alert('Generate failed', data?.error || data?.message || 'Unknown error');
         return;
       }
 
       const url = data?.outfit_url;
       if (typeof url === 'string' && url.length > 0) {
         setGeneratedOutfitUrl(url);
+        await appendSavedOutfit(url);
       } else {
         console.log('generate: missing outfit_url', data);
+        Alert.alert('Generate failed', 'Missing outfit_url in response.');
       }
     } catch (e) {
       console.log('generate exception:', e);
+      Alert.alert('Generate failed', 'Network error / backend not reachable.');
     } finally {
       setGenerating(false);
     }
@@ -145,7 +162,6 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-      {/* Background blobs */}
       <View style={styles.blobTopRight} />
       <View style={styles.blobBottomLeft} />
 
@@ -154,7 +170,6 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top bar */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => setShowTokens(true)}>
             <Ionicons name="person-outline" size={20} color="#3B3B3B" />
@@ -173,27 +188,10 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Heading + Your Clothes button */}
         <View style={styles.headingRow}>
           <Text style={styles.heading}>Craft your fit{'\n'}with Kiova</Text>
-
-          <TouchableOpacity
-            style={styles.yourClothesBtn}
-            onPress={() => setWardrobeSource((prev) => (prev === 'saved' ? 'YourClothes' : 'saved'))}
-          >
-            <Ionicons
-              name={wardrobeSource === 'saved' ? 'bookmark' : 'shirt-outline'}
-              size={13}
-              color="#fff"
-              style={{ marginRight: 5 }}
-            />
-            <Text style={styles.yourClothesText}>
-              {wardrobeSource === 'saved' ? 'Saved' : 'Your Clothes'}
-            </Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Category filters */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -212,18 +210,13 @@ export default function HomeScreen() {
           ))}
         </ScrollView>
 
-        {/* Wardrobe area */}
         <View style={styles.wardrobeBox}>
           {wardrobeIsEmpty ? (
             <View style={styles.emptyState}>
               <Ionicons name="information-circle-outline" size={28} color="#AAAAAA" />
-              <Text style={styles.emptyTitle}>
-                {wardrobeSource === 'saved' ? 'Your saved wardrobe is empty' : 'Your wardrobe is empty'}
-              </Text>
+              <Text style={styles.emptyTitle}>Your wardrobe is empty</Text>
               <Text style={styles.emptySubtitle}>
-                {wardrobeSource === 'saved'
-                  ? 'Save/import clothes first. Then come back to pick them here.'
-                  : 'Add clothes in your wardrobe first. Then come back to pick them here.'}
+                Add clothes in your wardrobe first. Then come back to pick them here.
               </Text>
             </View>
           ) : (
@@ -244,8 +237,6 @@ export default function HomeScreen() {
                     style={styles.bigCard}
                   >
                     <Image source={{ uri: item.image }} style={styles.bigImage} resizeMode="cover" />
-
-                    {/* ✅ selection check */}
                     {selected && (
                       <View style={styles.selectedBadge}>
                         <Ionicons name="checkmark" size={16} color="#fff" />
@@ -258,14 +249,12 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Outfit Generator */}
         <View style={styles.generatorSection}>
           <Text style={styles.generatorTitle}>Outfit generator</Text>
           <Text style={styles.generatorSub}>
             Pick pieces above. They show here, then Generate to build an outfit.
           </Text>
 
-          {/* ✅ slots */}
           <View style={styles.slotsRow}>
             {Array.from({ length: SLOT_COUNT }).map((_, i) => {
               const picked = selectedItems[i];
@@ -286,7 +275,6 @@ export default function HomeScreen() {
             })}
           </View>
 
-          {/* ✅ preview */}
           <View style={styles.previewBox}>
             {generating ? (
               <ActivityIndicator />
@@ -315,10 +303,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#F5F3F0',
-  },
+  safe: { flex: 1, backgroundColor: '#F5F3F0' },
   blobTopRight: {
     position: 'absolute',
     top: -60,
@@ -356,11 +341,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-  },
+  logoWrapper: { flexDirection: 'row', alignItems: 'center', position: 'relative' },
+  logoImage: { width: 120, height: 40 },
+
   headingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -368,28 +351,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 20,
   },
-  heading: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    lineHeight: 34,
-    flex: 1,
-  },
-  yourClothesBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    marginLeft: 12,
-    marginTop: 4,
-  },
-  yourClothesText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
+  heading: { fontSize: 26, fontWeight: '700', color: '#1A1A1A', lineHeight: 34, flex: 1 },
+
   categoriesContainer: {
     paddingHorizontal: 20,
     gap: 8,
@@ -404,28 +367,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0DDD8',
   },
-  categoryChipActive: {
-    backgroundColor: '#1A1A1A',
-    borderColor: '#1A1A1A',
-  },
-  categoryText: {
-    fontSize: 13,
-    color: '#444',
-    fontWeight: '500',
-  },
-  categoryTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
+  categoryChipActive: { backgroundColor: '#1A1A1A', borderColor: '#1A1A1A' },
+  categoryText: { fontSize: 13, color: '#444', fontWeight: '500' },
+  categoryTextActive: { color: '#fff', fontWeight: '600' },
 
   wardrobeBox: {
     marginHorizontal: 20,
     borderRadius: 20,
     backgroundColor: 'transparent',
-    paddingVertical: 0,
-    paddingHorizontal: 0,
-    alignItems: 'stretch',
-    justifyContent: 'flex-start',
     marginBottom: 4,
   },
 
@@ -436,12 +385,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
   },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#444',
-    marginTop: 6,
-  },
+  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#444', marginTop: 6 },
   emptySubtitle: {
     fontSize: 13,
     color: '#888',
@@ -450,10 +394,7 @@ const styles = StyleSheet.create({
     maxWidth: 260,
   },
 
-  carousel: {
-    paddingHorizontal: 20,
-    gap: 14,
-  },
+  carousel: { paddingHorizontal: 20, gap: 14 },
 
   bigCard: {
     width: 240,
@@ -462,12 +403,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     overflow: 'hidden',
   },
-
-  bigImage: {
-    width: '100%',
-    height: '100%',
-  },
-
+  bigImage: { width: '100%', height: '100%' },
   selectedBadge: {
     position: 'absolute',
     top: 12,
@@ -477,7 +413,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: 'rgba(0,0,0,0.7)',
     alignItems: 'center',
-    justifyContent: 'center', 
+    justifyContent: 'center',
   },
 
   generatorSection: {
@@ -487,22 +423,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.5)',
     padding: 20,
   },
-  generatorTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 4,
-  },
-  generatorSub: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 16,
-  },
-  slotsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
+  generatorTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 4 },
+  generatorSub: { fontSize: 12, color: '#888', marginBottom: 16 },
+
+  slotsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   slot: {
     width: 44,
     height: 44,
@@ -514,10 +438,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  slotImg: {
-    width: '100%',
-    height: '100%',
-  },
+  slotImg: { width: '100%', height: '100%' },
 
   previewBox: {
     height: 460,
@@ -529,14 +450,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     overflow: 'hidden',
   },
-  previewText: {
-    fontSize: 14,
-    color: '#AAAAAA',
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
+  previewText: { fontSize: 14, color: '#AAAAAA' },
+  previewImage: { width: '100%', height: '100%' },
 
   generateBtn: {
     flexDirection: 'row',
@@ -548,13 +463,5 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     paddingHorizontal: 24,
   },
-  generateText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  logoImage: {
-    width: 120,
-    height: 40,
-  },
+  generateText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
