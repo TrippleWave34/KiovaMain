@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import TokenModal from '../payment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get("window");
 
@@ -31,6 +32,8 @@ type ClothingItem = {
   category: string;
 };
 
+const WARDROBE_KEY = 'kiova:wardrobe_items';
+
 export default function WardrobeScreen() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [wardrobeItems, setWardrobeItems] = useState<ClothingItem[]>([]);
@@ -40,6 +43,30 @@ export default function WardrobeScreen() {
 
   const isWardrobe = view === "wardrobe";
   const items = isWardrobe ? wardrobeItems : savedItems;
+
+  // ✅ charge wardrobe depuis AsyncStorage au lancement
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(WARDROBE_KEY);
+        const parsed = raw ? (JSON.parse(raw) as ClothingItem[]) : [];
+        setWardrobeItems(Array.isArray(parsed) ? parsed : []);
+      } catch (e) {
+        console.log('WardrobeScreen load error:', e);
+        setWardrobeItems([]);
+      }
+    };
+    load();
+  }, []);
+
+  // ✅ helper save
+  const saveWardrobe = async (next: ClothingItem[]) => {
+    try {
+      await AsyncStorage.setItem(WARDROBE_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.log('WardrobeScreen save error:', e);
+    }
+  };
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -59,7 +86,11 @@ export default function WardrobeScreen() {
         category: "Tops",
       };
       if (isWardrobe) {
-        setWardrobeItems((prev) => [...prev, newItem]);
+        setWardrobeItems((prev) => {
+          const next = [...prev, newItem];
+          saveWardrobe(next); // ✅ persist
+          return next;
+        });
       } else {
         setSavedItems((prev) => [...prev, newItem]);
       }
@@ -68,7 +99,11 @@ export default function WardrobeScreen() {
 
   const removeItem = (id: string) => {
     if (isWardrobe) {
-      setWardrobeItems((prev) => prev.filter((i) => i.id !== id));
+      setWardrobeItems((prev) => {
+        const next = prev.filter((i) => i.id !== id);
+        saveWardrobe(next); // ✅ persist
+        return next;
+      });
     } else {
       setSavedItems((prev) => prev.filter((i) => i.id !== id));
     }
@@ -87,8 +122,8 @@ export default function WardrobeScreen() {
       {/* Top Header */}
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.iconCircle} onPress={() => setShowTokens(true)}>
-  <Ionicons name="person-outline" size={20} color="#555" />
-</TouchableOpacity>
+          <Ionicons name="person-outline" size={20} color="#555" />
+        </TouchableOpacity>
 
         {/* Logo — identical to HomeScreen */}
         <View style={styles.logoWrapper}>
@@ -148,7 +183,7 @@ export default function WardrobeScreen() {
                 {isWardrobe ? "Add item" : "Save item"}
               </Text>
             </TouchableOpacity>
-          
+
           </View>
         </View>
 
@@ -224,7 +259,7 @@ export default function WardrobeScreen() {
                   <Text style={styles.cardTagText}>{item.category}</Text>
                 </View>
               </TouchableOpacity>
-             
+
             ))}
           </View>
         )}

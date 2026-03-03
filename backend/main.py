@@ -168,6 +168,38 @@ async def save_favourite(
             "message": "Error saving favourite image",
             "error": str(e)
         }
+    
+@app.post("/save-image")
+async def save_image_route(
+    image: UploadFile = File(...),
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    uid = user["uid"]
+
+    try:
+        # store image and get URL
+        image_url = await store_image(image)
+
+        new_image = Image(
+            id=str(uuid.uuid4()),
+            uid=uid,
+            image_url=image_url
+        )
+
+        db.add(new_image)
+        db.commit()
+
+        return {
+            "message": "Image saved",
+            "uid": uid,
+            "image_url": image_url
+        }
+    except Exception as e:
+        return {
+            "message": "Error saving image",
+            "error": str(e)
+        }
 
 
 @app.get("/wardrobe")

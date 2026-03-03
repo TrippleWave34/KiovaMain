@@ -6,11 +6,15 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import TokenModal from '../payment';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const BACKEND_URL = 'http://10.0.2.2:8001'; // <-- change si besoin
 
 const CATEGORIES = [
   { id: '1', label: 'All' },
@@ -24,16 +28,118 @@ const CATEGORIES = [
 ];
 const SLOT_COUNT = 6;
 
+type ClothingItem = {
+  id: string;
+  image: string;
+  category: string;
+};
+
+const WARDROBE_KEY = 'kiova:wardrobe_items';
+
 export default function HomeScreen() {
   const [activeCategory, setActiveCategory] = useState('1');
   const [wardrobeSource, setWardrobeSource] = useState<'saved' | 'YourClothes'>('saved');
   const [showTokens, setShowTokens] = useState(false); // ← token modal state
 
-  const savedWardrobeItems: Array<{ id: string }> = [];
-  const YourClothesWardrobeItems: Array<{ id: string }> = [];
+  const [YourClothesWardrobeItems, setYourClothesWardrobeItems] = useState<ClothingItem[]>([]);
+  const savedWardrobeItems: ClothingItem[] = [];
 
-  const activeItems = wardrobeSource === 'saved' ? savedWardrobeItems : YourClothesWardrobeItems;
+  // ✅ selected items (max SLOT_COUNT)
+  const [selectedItems, setSelectedItems] = useState<ClothingItem[]>([]);
+
+  // ✅ generated outfit preview
+  const [generating, setGenerating] = useState(false);
+  const [generatedOutfitUrl, setGeneratedOutfitUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(WARDROBE_KEY);
+        const items = raw ? (JSON.parse(raw) as ClothingItem[]) : [];
+        setYourClothesWardrobeItems(Array.isArray(items) ? items : []);
+      } catch (e) {
+        console.log('HomeScreen load wardrobe error:', e);
+        setYourClothesWardrobeItems([]);
+      }
+    };
+
+    load();
+
+    const interval = setInterval(load, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const activeItemsRaw = wardrobeSource === 'saved' ? savedWardrobeItems : YourClothesWardrobeItems;
+
+  // ✅ simple category filter (matches item.category strings like "Tops")
+  const activeCategoryLabel = useMemo(() => {
+    const found = CATEGORIES.find((c) => c.id === activeCategory);
+    return found?.label ?? 'All';
+  }, [activeCategory]);
+
+  const activeItems = useMemo(() => {
+    if (activeCategoryLabel === 'All') return activeItemsRaw;
+    return activeItemsRaw.filter((it) => it.category === activeCategoryLabel);
+  }, [activeItemsRaw, activeCategoryLabel]);
+
   const wardrobeIsEmpty = activeItems.length === 0;
+
+  const isSelected = (item: ClothingItem) => selectedItems.some((s) => s.id === item.id);
+
+  const toggleSelect = (item: ClothingItem) => {
+    setSelectedItems((prev) => {
+      const exists = prev.some((s) => s.id === item.id);
+      if (exists) {
+        return prev.filter((s) => s.id !== item.id);
+      }
+      if (prev.length >= SLOT_COUNT) return prev; // max
+      return [...prev, item];
+    });
+
+    // option : reset preview when selection changes
+    setGeneratedOutfitUrl(null);
+  };
+
+  const removeSelectedById = (id: string) => {
+    setSelectedItems((prev) => prev.filter((s) => s.id !== id));
+    setGeneratedOutfitUrl(null);
+  };
+
+  const handleGenerate = async () => {
+    if (generating) return;
+    if (selectedItems.length === 0) return;
+
+    try {
+      setGenerating(true);
+      setGeneratedOutfitUrl(null);
+
+      const res = await fetch(`${BACKEND_URL}/generate-outfit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: selectedItems.map((s) => s.image),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.log('generate error:', data);
+        return;
+      }
+
+      const url = data?.outfit_url;
+      if (typeof url === 'string' && url.length > 0) {
+        setGeneratedOutfitUrl(url);
+      } else {
+        console.log('generate: missing outfit_url', data);
+      }
+    } catch (e) {
+      console.log('generate exception:', e);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -50,12 +156,7 @@ export default function HomeScreen() {
       >
         {/* Top bar */}
         <View style={styles.topBar}>
-
-          {/* ← Person icon now opens token modal */}
-          <TouchableOpacity
-            style={styles.iconBtn}
-            onPress={() => setShowTokens(true)}
-          >
+          <TouchableOpacity style={styles.iconBtn} onPress={() => setShowTokens(true)}>
             <Ionicons name="person-outline" size={20} color="#3B3B3B" />
           </TouchableOpacity>
 
@@ -117,9 +218,7 @@ export default function HomeScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="information-circle-outline" size={28} color="#AAAAAA" />
               <Text style={styles.emptyTitle}>
-                {wardrobeSource === 'saved'
-                  ? 'Your saved wardrobe is empty'
-                  : 'Your wardrobe is empty'}
+                {wardrobeSource === 'saved' ? 'Your saved wardrobe is empty' : 'Your wardrobe is empty'}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {wardrobeSource === 'saved'
@@ -128,11 +227,34 @@ export default function HomeScreen() {
               </Text>
             </View>
           ) : (
-            <View style={styles.itemsGrid}>
-              {activeItems.map((item) => (
-                <View key={item.id} style={styles.itemCard} />
-              ))}
-            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carousel}
+              snapToInterval={260}
+              decelerationRate="fast"
+            >
+              {activeItems.map((item) => {
+                const selected = isSelected(item);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    activeOpacity={0.9}
+                    onPress={() => toggleSelect(item)}
+                    style={styles.bigCard}
+                  >
+                    <Image source={{ uri: item.image }} style={styles.bigImage} resizeMode="cover" />
+
+                    {/* ✅ selection check */}
+                    {selected && (
+                      <View style={styles.selectedBadge}>
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           )}
         </View>
 
@@ -143,19 +265,43 @@ export default function HomeScreen() {
             Pick pieces above. They show here, then Generate to build an outfit.
           </Text>
 
+          {/* ✅ slots */}
           <View style={styles.slotsRow}>
-            {Array.from({ length: SLOT_COUNT }).map((_, i) => (
-              <View key={i} style={styles.slot} />
-            ))}
+            {Array.from({ length: SLOT_COUNT }).map((_, i) => {
+              const picked = selectedItems[i];
+              return (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.slot}
+                  activeOpacity={picked ? 0.8 : 1}
+                  onPress={() => {
+                    if (picked) removeSelectedById(picked.id);
+                  }}
+                >
+                  {picked ? (
+                    <Image source={{ uri: picked.image }} style={styles.slotImg} resizeMode="cover" />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
+          {/* ✅ preview */}
           <View style={styles.previewBox}>
-            <Ionicons name="sparkles" size={28} color="#CCCCCC" />
-            <Text style={styles.previewText}>Generated outfit preview</Text>
+            {generating ? (
+              <ActivityIndicator />
+            ) : generatedOutfitUrl ? (
+              <Image source={{ uri: generatedOutfitUrl }} style={styles.previewImage} resizeMode="contain" />
+            ) : (
+              <>
+                <Ionicons name="sparkles" size={28} color="#CCCCCC" />
+                <Text style={styles.previewText}>Generated outfit preview</Text>
+              </>
+            )}
           </View>
 
-          <TouchableOpacity style={styles.generateBtn}>
-            <Text style={styles.generateText}>Generate</Text>
+          <TouchableOpacity style={styles.generateBtn} onPress={handleGenerate} activeOpacity={0.9}>
+            <Text style={styles.generateText}>{generating ? 'Generating...' : 'Generate'}</Text>
             <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
           </TouchableOpacity>
         </View>
@@ -163,9 +309,7 @@ export default function HomeScreen() {
         <View style={{ height: 110 }} />
       </ScrollView>
 
-      {/* ← Token modal sits outside ScrollView so it overlays everything */}
       <TokenModal visible={showTokens} onClose={() => setShowTokens(false)} />
-
     </SafeAreaView>
   );
 }
@@ -273,19 +417,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+
   wardrobeBox: {
     marginHorizontal: 20,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    padding: 24,
-    minHeight: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
     marginBottom: 4,
   },
+
   emptyState: {
     alignItems: 'center',
     gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.75)',
+    borderRadius: 20,
+    padding: 24,
   },
   emptyTitle: {
     fontSize: 15,
@@ -300,20 +449,37 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     maxWidth: 260,
   },
-  itemsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 10,
+
+  carousel: {
+    paddingHorizontal: 20,
+    gap: 14,
   },
-  itemCard: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
+
+  bigCard: {
+    width: 240,
+    height: 300,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    overflow: 'hidden',
   },
+
+  bigImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  selectedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center', 
+  },
+
   generatorSection: {
     marginHorizontal: 20,
     marginTop: 20,
@@ -344,7 +510,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#CCCCCC',
     backgroundColor: 'rgba(255,255,255,0.6)',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  slotImg: {
+    width: '100%',
+    height: '100%',
+  },
+
   previewBox: {
     height: 460,
     borderRadius: 20,
@@ -353,11 +527,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     marginBottom: 16,
+    overflow: 'hidden',
   },
   previewText: {
     fontSize: 14,
     color: '#AAAAAA',
   },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+  },
+
   generateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
