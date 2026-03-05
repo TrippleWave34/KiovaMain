@@ -33,7 +33,7 @@ function crossConfirm(title: string, message: string, onConfirm: () => void) {
 }
 
 const WEEKLY_FREE_TOKENS = 5;
-const API_URL = "http://127.0.0.1:8001";
+const API_URL = "https://kiova-fgggb7a3auhxa3cr.swedencentral-01.azurewebsites.net";
 
 export default function TokenModal({
   visible,

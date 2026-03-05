@@ -19,7 +19,7 @@ import { useAuth } from "../../AuthContext";
 
 const { width, height } = Dimensions.get("window");
 
-const API_BASE = "http://127.0.0.1:8001";
+const API_BASE = "https://kiova-fgggb7a3auhxa3cr.swedencentral-01.azurewebsites.net";
 
 const CATEGORIES = [
   { id: "1", label: "All" },

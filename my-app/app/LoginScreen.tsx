@@ -15,7 +15,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../AuthContext';
 
-const FIREBASE_API_KEY = 'AIzaSyBZ_WLPCklEj7wWlyUjOFjJqChU6OglTpE';
+const FIREBASE_API_KEY = 'AIzaSyBO2fmkGoxJxL4r_z_Bvqw31hpNWC0hF0o';
 
 export default function LoginScreen() {
   const { setUser } = useAuth();
@@ -30,6 +30,27 @@ export default function LoginScreen() {
 
   // Stored after successful login but before verification check
   const [pendingToken, setPendingToken] = useState('');
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Enter your email address first');
+      return;
+    }
+    try {
+      await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestType: 'PASSWORD_RESET', email }),
+        }
+      );
+      setError('');
+      alert('Password reset email sent! Check your inbox.');
+    } catch {
+      setError('Failed to send reset email. Try again.');
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -210,7 +231,7 @@ export default function LoginScreen() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.forgotWrapper}>
+          <TouchableOpacity style={styles.forgotWrapper} onPress={handleForgotPassword}>
             <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
@@ -223,7 +244,7 @@ export default function LoginScreen() {
 
           <TouchableOpacity onPress={() => router.replace('/SignUpScreen')}>
             <Text style={styles.signupText}>
-              Don't have an account? <Text style={styles.signupLink}>Sign up</Text>
+              Don&apos;t have an account? <Text style={styles.signupLink}>Sign up</Text>
             </Text>
           </TouchableOpacity>
         </View>

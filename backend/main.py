@@ -42,7 +42,7 @@ def get_db():
         db.close()
 
 # ── Firebase ───────────────────────────────────────────────────────────────────
-firebase_key = "hackathon-project-e9087-firebase-adminsdk-fbsvc-948b54a897.json"
+firebase_key = "kiova-cddb5-firebase-adminsdk-fbsvc-0ae9b336ca.json"
 cred = credentials.Certificate(firebase_key)
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
