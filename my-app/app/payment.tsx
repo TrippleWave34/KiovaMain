@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import { auth } from "./firebase";
+import { useAuth } from "../AuthContext";
 
 function crossAlert(title: string, message: string) {
   if (Platform.OS === "web") {
@@ -35,21 +35,6 @@ function crossConfirm(title: string, message: string, onConfirm: () => void) {
 const WEEKLY_FREE_TOKENS = 5;
 const API_URL = "http://127.0.0.1:8001";
 
-async function getToken(): Promise<string> {
-  // TEMP: bypass auth for testing
-  return "test-token";
-  // TODO: restore when auth is connected:
-  // const user = auth.currentUser;
-  // if (!user) throw new Error("Not logged in");
-  // return await user.getIdToken();
-}
-
-async function getUid(): Promise<string> {
-  // TEMP
-  return "test-user-123";
-  // TODO: return auth.currentUser?.uid ?? "";
-}
-
 export default function TokenModal({
   visible,
   onClose,
@@ -57,6 +42,7 @@ export default function TokenModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const { user, getToken } = useAuth();
   const [tokens, setTokens]       = useState<number | null>(null);
   const [nextReset, setNextReset] = useState("...");
   const [loading, setLoading]     = useState(false);
@@ -88,7 +74,7 @@ export default function TokenModal({
       setLoading(true);
       try {
         const token = await getToken();
-        const uid   = await getUid();
+        const uid   = user?.uid ?? 'test-user-123';
 
         const res = await fetch(`${API_URL}/payments/create-checkout-session-plan`, {
           method: "POST",
@@ -135,8 +121,8 @@ export default function TokenModal({
               <Ionicons name="person-outline" size={22} color="#555" />
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.username}>Username</Text>
-              <Text style={styles.email}>email@example.com</Text>
+              <Text style={styles.username}>{user?.displayName || user?.email?.split('@')[0] || 'User'}</Text>
+              <Text style={styles.email}>{user?.email || 'Not signed in'}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Feather name="x" size={18} color="#888" />

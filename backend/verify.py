@@ -7,15 +7,8 @@ security = HTTPBearer()
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    # TEMP: bypass auth for testing
-    if credentials.credentials == "test-token":
-        return {"uid": "test-user-123"}
-
-    # TODO: restore proper verification when auth is connected
     try:
-        print("TOKEN RECEIVED:", credentials.credentials)
         decoded_token = auth.verify_id_token(credentials.credentials)
-        print("DECODED OK:", decoded_token)
         return decoded_token
     except Exception as e:
         print("TOKEN ERROR:", e)

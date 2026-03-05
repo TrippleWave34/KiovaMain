@@ -15,7 +15,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import TokenModal from "../payment";
-import { auth } from "../firebase";
+import { useAuth } from "../../AuthContext";
 
 const { width, height } = Dimensions.get("window");
 
@@ -49,6 +49,7 @@ type ClothingItem = {
 };
 
 export default function WardrobeScreen() {
+  const { getToken } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [wardrobeItems, setWardrobeItems]       = useState<ClothingItem[]>([]);
   const [savedItems, setSavedItems]             = useState<ClothingItem[]>([]);
@@ -70,10 +71,6 @@ export default function WardrobeScreen() {
   useEffect(() => {
     fetchWardrobe();
   }, []);
-
-  const getToken = async (): Promise<string | null> => {
-    return "test-token";
-  };
 
   const fetchWardrobe = async () => {
     try {
@@ -186,7 +183,7 @@ export default function WardrobeScreen() {
       const token = await getToken();
       await fetch(`${API_BASE}${endpoint}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token ?? 'test-token'}` },
+        headers: { Authorization: `Bearer ${await getToken()}` },
       });
     } catch (e) {
       console.error('Delete failed:', e);

@@ -23,6 +23,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import TokenModal from '../payment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../AuthContext';
 
 const BACKEND_URL = 'http://127.0.0.1:8001';
 
@@ -46,6 +47,7 @@ type ClothingItem = {
 };
 
 export default function HomeScreen() {
+  const { getToken } = useAuth();
   const [activeCategory, setActiveCategory]         = useState('1');
   const [showTokens, setShowTokens]                 = useState(false);
   const [wardrobeItems, setWardrobeItems]           = useState<ClothingItem[]>([]);
@@ -61,8 +63,9 @@ export default function HomeScreen() {
   // ── Load from backend ───────────────────────────────────────────────────────
   const loadWardrobe = async () => {
     try {
+      const token = await getToken();
       const res  = await fetch(`${BACKEND_URL}/wardrobe`, {
-        headers: { Authorization: 'Bearer test-token' },
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
       setWardrobeItems(data.images    ?? []);
@@ -125,7 +128,7 @@ export default function HomeScreen() {
     try {
       await fetch(`${BACKEND_URL}${endpoint}`, {
         method: 'DELETE',
-        headers: { Authorization: 'Bearer test-token' },
+        headers: { Authorization: `Bearer ${await getToken()}` },
       });
     } catch (e) {
       console.log('Delete failed:', e);
@@ -158,7 +161,7 @@ export default function HomeScreen() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer test-token',
+          'Authorization': `Bearer ${await getToken()}`,
         },
         body: JSON.stringify({ items: selectedItems.map((s) => s.image_url) }),
       });
