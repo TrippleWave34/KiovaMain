@@ -25,7 +25,7 @@ import TokenModal from '../payment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../AuthContext';
 
-const BACKEND_URL = 'https://kiova-fgggb7a3auhxa3cr.swedencentral-01.azurewebsites.net';
+const BACKEND_URL = "https://kiovamain.onrender.com";
 
 const CATEGORIES = [
   { id: '1', label: 'All' },
