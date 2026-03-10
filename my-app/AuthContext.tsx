@@ -20,10 +20,20 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUserState] = useState<AuthUser | null>(null);
 
-  // Optional: persist token refresh with Firebase SDK
-  // For now we store what we got at login
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('kiova_user');
+      if (saved) setUserState(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  const setUser = (u: AuthUser | null) => {
+    setUserState(u);
+    if (u) localStorage.setItem('kiova_user', JSON.stringify(u));
+    else localStorage.removeItem('kiova_user');
+  };
 
   const getToken = async (): Promise<string> => {
     if (!user) throw new Error('Not logged in');
