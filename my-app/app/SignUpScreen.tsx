@@ -13,17 +13,20 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
-const FIREBASE_API_KEY = 'AIzaSyBZ_WLPCklEj7wWlyUjOFjJqChU6OglTpE';
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+} from 'firebase/auth';
+import { firebaseAuth } from '../AuthContext';
 
 export default function SignUpScreen() {
-  const [email, setEmail]                   = useState('');
-  const [password, setPassword]             = useState('');
+  const [email, setEmail]                     = useState('');
+  const [password, setPassword]               = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword]     = useState(false);
-  const [showConfirm, setShowConfirm]       = useState(false);
-  const [error, setError]                   = useState('');
-  const [loading, setLoading]               = useState(false);
+  const [showPassword, setShowPassword]       = useState(false);
+  const [showConfirm, setShowConfirm]         = useState(false);
+  const [error, setError]                     = useState('');
+  const [loading, setLoading]                 = useState(false);
 
   const handleSignUp = async () => {
     if (!email || !password || !confirmPassword) {
@@ -43,45 +46,17 @@ export default function SignUpScreen() {
     setLoading(true);
 
     try {
-      // 1. Create account
-      const signUpRes = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, returnSecureToken: true }),
-        }
-      );
-
-      const signUpData = await signUpRes.json();
-
-      if (signUpData.error) {
-        const code = signUpData.error.message;
-        if (code === 'EMAIL_EXISTS')           setError('An account with this email already exists');
-        else if (code === 'INVALID_EMAIL')     setError('Invalid email address');
-        else if (code.includes('WEAK_PASSWORD')) setError('Password must be at least 6 characters');
-        else if (code === 'TOO_MANY_ATTEMPTS_TRY_LATER') setError('Too many attempts. Try again later');
-        else setError('Something went wrong. Please try again');
-        return;
-      }
-
-      const idToken = signUpData.idToken;
-
-      // 2. Send verification email
-      await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestType: 'VERIFY_EMAIL', idToken }),
-        }
-      );
-
-      // 3. Go to verify email screen
+      const result = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      await sendEmailVerification(result.user);
+      await firebaseAuth.signOut();
       router.replace({ pathname: '/VerifyEmailScreen', params: { email } });
-
-    } catch (err) {
-      setError('Network error. Check your connection');
+    } catch (err: any) {
+      const code = err.code;
+      if (code === 'auth/email-already-in-use') setError('An account with this email already exists');
+      else if (code === 'auth/invalid-email')   setError('Invalid email address');
+      else if (code === 'auth/weak-password')   setError('Password must be at least 6 characters');
+      else if (code === 'auth/too-many-requests') setError('Too many attempts. Try again later');
+      else setError('Something went wrong. Please try again');
     } finally {
       setLoading(false);
     }
