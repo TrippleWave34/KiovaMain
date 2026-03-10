@@ -1,11 +1,16 @@
+
+Copy
+
 from dotenv import load_dotenv
 load_dotenv()
 
 import os
 import uuid
+import json
 import requests
 
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -42,9 +47,13 @@ def get_db():
         db.close()
 
 # ── Firebase ───────────────────────────────────────────────────────────────────
-firebase_key = "kiova-cddb5-firebase-adminsdk-fbsvc-0ae9b336ca.json"
-cred = credentials.Certificate(firebase_key)
 if not firebase_admin._apps:
+    firebase_creds_json = os.getenv("FIREBASE_CREDENTIALS")
+    if firebase_creds_json:
+        firebase_creds_dict = json.loads(firebase_creds_json)
+        cred = credentials.Certificate(firebase_creds_dict)
+    else:
+        cred = credentials.Certificate("kiova-cddb5-firebase-adminsdk-fbsvc-0ae9b336ca.json")
     firebase_admin.initialize_app(cred)
 
 custom_token = auth.create_custom_token("user-uid")
@@ -83,8 +92,8 @@ def sign_in_user(email: str, password: str) -> str:
 # ── Stripe ─────────────────────────────────────────────────────────────────────
 stripe.api_key        = os.getenv("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
-SUCCESS_URL           = os.getenv("FRONTEND_SUCCESS_URL", "https://example.com/success")
-CANCEL_URL            = os.getenv("FRONTEND_CANCEL_URL",  "https://example.com/cancel")
+SUCCESS_URL           = os.getenv("FRONTEND_SUCCESS_URL", "https://kiovamain.onrender.com/payment-success")
+CANCEL_URL            = os.getenv("FRONTEND_CANCEL_URL",  "https://kiovamain.onrender.com/payment-cancel")
 PLAN_TOKENS           = {"basic": 5, "pro": 10}
 PLAN_PRICES_GBP       = {"basic": 199, "pro": 299}
 
@@ -96,6 +105,38 @@ PLAN_PRICES_GBP       = {"basic": 199, "pro": 299}
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+
+@app.get("/payment-success", response_class=HTMLResponse)
+async def payment_success():
+    return """
+    <html>
+        <head><title>Payment Successful</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:50px;background:#f9f9f9;">
+            <div style="max-width:400px;margin:auto;background:white;padding:40px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+                <h1 style="color:#4CAF50;">✅ Payment Successful!</h1>
+                <p style="color:#555;">Your tokens have been added to your Kiova account.</p>
+                <p style="color:#555;">You can close this page and return to the app.</p>
+            </div>
+        </body>
+    </html>
+    """
+
+
+@app.get("/payment-cancel", response_class=HTMLResponse)
+async def payment_cancel():
+    return """
+    <html>
+        <head><title>Payment Cancelled</title></head>
+        <body style="font-family:sans-serif;text-align:center;padding:50px;background:#f9f9f9;">
+            <div style="max-width:400px;margin:auto;background:white;padding:40px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
+                <h1 style="color:#f44336;">❌ Payment Cancelled</h1>
+                <p style="color:#555;">Your payment was cancelled. No charges were made.</p>
+                <p style="color:#555;">You can close this page and return to the app.</p>
+            </div>
+        </body>
+    </html>
+    """
 
 
 @app.post("/register")
