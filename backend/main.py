@@ -20,7 +20,7 @@ from verify import get_current_user
 
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
-from models import Image, FavouriteImage, UserTokens
+from models import Image, FavouriteImage, UserTokens, ProcessedPayment
 
 import firebase_admin
 from firebase_admin import credentials, auth
@@ -112,8 +112,8 @@ async def payment_success():
         <body style="font-family:sans-serif;text-align:center;padding:50px;background:#f9f9f9;">
             <div style="max-width:400px;margin:auto;background:white;padding:40px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
                 <h1 style="color:#4CAF50;">✅ Payment Successful!</h1>
-                <p style="color:#555;">Your tokens have been added to your Kiova account.</p>
-                <p style="color:#555;">You can close this page and return to the app.</p>
+                <p style="color:#555;">Your payment is confirmed.</p>
+                <p style="color:#555;">Close this tab, return to Kiova and tap <strong>"I've paid — add my tokens"</strong> to receive your tokens.</p>
             </div>
         </body>
     </html>
@@ -129,7 +129,7 @@ async def payment_cancel():
             <div style="max-width:400px;margin:auto;background:white;padding:40px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
                 <h1 style="color:#f44336;">❌ Payment Cancelled</h1>
                 <p style="color:#555;">Your payment was cancelled. No charges were made.</p>
-                <p style="color:#555;">You can close this page and return to the app.</p>
+                <p style="color:#555;">You can close this page and return to Kiova.</p>
             </div>
         </body>
     </html>
@@ -324,6 +324,45 @@ async def create_checkout_session_plan(body: PlanCheckoutRequest):
         return {"id": session.id, "url": session.url, "plan": plan}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class VerifySessionRequest(BaseModel):
+    session_id: str
+    uid: str
+
+@app.post("/payments/verify-session")
+async def verify_session(body: VerifySessionRequest, db: Session = Depends(get_db)):
+    try:
+        session = stripe.checkout.Session.retrieve(body.session_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not retrieve session: {str(e)}")
+
+    if session.payment_status != "paid":
+        return {"credited": False, "already_credited": False, "message": "Payment not completed yet"}
+
+    metadata = session.get("metadata", {})
+    session_uid = metadata.get("uid", "")
+    plan = metadata.get("plan", "")
+
+    if session_uid != body.uid:
+        raise HTTPException(status_code=403, detail="Session does not belong to this user")
+
+    if plan not in PLAN_TOKENS:
+        raise HTTPException(status_code=400, detail="Invalid plan in session metadata")
+
+    payment_intent = session.payment_intent
+    already = db.query(ProcessedPayment).filter(ProcessedPayment.payment_intent == payment_intent).first()
+    if already:
+        return {"credited": False, "already_credited": True, "message": "Already credited"}
+
+    amount = PLAN_TOKENS[plan]
+    result = credit_tokens(body.uid, amount, db)
+
+    db.add(ProcessedPayment(payment_intent=payment_intent, uid=body.uid, plan=plan))
+    db.commit()
+
+    print(f"✅ VERIFIED uid={body.uid} plan={plan} +{amount} tokens (balance: {result['tokens']})")
+    return {"credited": True, "already_credited": False, "amount": amount, "tokens": result["tokens"]}
 
 
 @app.post("/stripe/webhook")
