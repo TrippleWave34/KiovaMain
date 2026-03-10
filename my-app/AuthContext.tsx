@@ -1,70 +1,75 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Platform } from 'react-native';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBO2fmkGoxJxL4r_z_Bvqw31hpNWC0hF0o",
+  authDomain: "kiova-cddb5.firebaseapp.com",
+  projectId: "kiova-cddb5",
+};
+
+if (!getApps().length) {
+  initializeApp(firebaseConfig);
+}
+
+const firebaseAuth = getAuth();
 
 type AuthUser = {
   uid: string;
   email: string;
   displayName: string | null;
-  idToken: string;
+  firebaseUser: User;
 };
 
 type AuthContextType = {
   user: AuthUser | null;
-  setUser: (user: AuthUser | null) => void;
+  loading: boolean;
   getToken: () => Promise<string>;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  setUser: () => {},
-  getToken: async () => 'test-token',
+  loading: true,
+  getToken: async () => '',
+  signOut: async () => {},
 });
 
-const STORAGE_KEY = 'kiova_user';
-
-function saveUser(u: AuthUser | null) {
-  try {
-    if (Platform.OS === 'web') {
-      if (u) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-      else window.localStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {}
-}
-
-function loadUser(): AuthUser | null {
-  try {
-    if (Platform.OS === 'web') {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    }
-  } catch {}
-  return null;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUserState] = useState<AuthUser | null>(null);
-  const [ready, setReady] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = loadUser();
-    if (saved) setUserState(saved);
-    setReady(true);
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+      if (firebaseUser && firebaseUser.emailVerified) {
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email ?? '',
+          displayName: firebaseUser.displayName,
+          firebaseUser,
+        });
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
   }, []);
 
-  const setUser = (u: AuthUser | null) => {
-    setUserState(u);
-    saveUser(u);
-  };
-
+  // Always gets a fresh token — Firebase SDK refreshes automatically
   const getToken = async (): Promise<string> => {
-    if (!user) throw new Error('Not logged in');
-    return user.idToken;
+    const currentUser = firebaseAuth.currentUser;
+    if (!currentUser) throw new Error('Not logged in');
+    return await currentUser.getIdToken();
   };
 
-  if (!ready) return null;
+  const signOut = async () => {
+    await firebaseAuth.signOut();
+    setUser(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, getToken }}>
+    <AuthContext.Provider value={{ user, loading, getToken, signOut }}>
       {children}
     </AuthContext.Provider>
   );
@@ -73,4 +78,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
+export { firebaseAuth };
 
