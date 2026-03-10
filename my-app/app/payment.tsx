@@ -43,38 +43,66 @@ export default function TokenModal({
   onClose: () => void;
 }) {
   const { user, getToken } = useAuth();
-  const [tokens, setTokens]       = useState<number | null>(null);
+  const [tokens, setTokens] = useState<number | null>(null);
   const [nextReset, setNextReset] = useState("...");
-  const [loading, setLoading]     = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
 
   const fetchBalance = async () => {
     try {
       const token = await getToken();
-      const res   = await fetch(`${API_URL}/tokens`, {
+      const res = await fetch(`${API_URL}/tokens`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) return;
       const data = await res.json();
       setTokens(data.tokens);
       setNextReset(data.next_reset);
+      return data.tokens;
     } catch (e) {
       console.error("Failed to fetch token balance:", e);
     }
   };
 
-  // Refresh balance every time the modal opens
   useEffect(() => {
     if (visible) fetchBalance();
   }, [visible]);
+
+  // Poll for token update after payment
+  const pollForTokenUpdate = async (previousTokens: number) => {
+    setPaymentPending(true);
+    let attempts = 0;
+    const maxAttempts = 12; // poll for 60 seconds
+
+    const poll = async () => {
+      attempts++;
+      const newTokens = await fetchBalance();
+      if (newTokens && newTokens > previousTokens) {
+        // Tokens updated!
+        setPaymentPending(false);
+        crossAlert("✅ Payment Successful!", `${newTokens - previousTokens} tokens have been added to your account.`);
+        return;
+      }
+      if (attempts < maxAttempts) {
+        setTimeout(poll, 5000); // check every 5 seconds
+      } else {
+        setPaymentPending(false);
+        crossAlert("Payment received", "Your tokens will appear shortly. Please refresh if they don't show up in a minute.");
+      }
+    };
+
+    setTimeout(poll, 3000); // start polling after 3 seconds
+  };
 
   const handleTopUp = async (plan: "basic" | "pro") => {
     const pretty = plan === "basic" ? "5 tokens for £1.99" : "10 tokens for £2.99";
 
     crossConfirm("Top Up Tokens", `Purchase ${pretty}?`, async () => {
       setLoading(true);
+      const previousTokens = tokens ?? 0;
       try {
         const token = await getToken();
-        const uid   = user?.uid ?? 'test-user-123';
+        const uid = user?.uid ?? 'test-user-123';
 
         const res = await fetch(`${API_URL}/payments/create-checkout-session-plan`, {
           method: "POST",
@@ -88,16 +116,15 @@ export default function TokenModal({
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || "Failed to create checkout session");
 
-        // Open Stripe Checkout in browser
         if (Platform.OS === "web") {
           window.open(data.url, "_blank");
         } else {
           await WebBrowser.openBrowserAsync(data.url);
         }
 
-        // Poll for balance update after user returns (webhook may take a moment)
-        setTimeout(fetchBalance, 3000);
-        setTimeout(fetchBalance, 6000);
+        // Start polling for token update
+        pollForTokenUpdate(previousTokens);
+
       } catch (e: any) {
         crossAlert("Payment error", e.message);
       } finally {
@@ -106,9 +133,12 @@ export default function TokenModal({
     });
   };
 
-  const displayTokens  = tokens ?? 0;
-  const tokenPct       = Math.min((displayTokens / WEEKLY_FREE_TOKENS) * 100, 100);
-  const progressColour = displayTokens === 0 ? "#E05555" : displayTokens <= 2 ? "#F4A261" : "#6B4EFF";
+  // Split tokens into free and bonus
+  const totalTokens = tokens ?? 0;
+  const freeTokens = Math.min(totalTokens, WEEKLY_FREE_TOKENS);
+  const bonusTokens = Math.max(0, totalTokens - WEEKLY_FREE_TOKENS);
+  const freeTokenPct = Math.min((freeTokens / WEEKLY_FREE_TOKENS) * 100, 100);
+  const progressColour = freeTokens === 0 ? "#E05555" : freeTokens <= 2 ? "#F4A261" : "#6B4EFF";
 
   return (
     <Modal visible={visible} animationType="fade" transparent>
@@ -140,7 +170,7 @@ export default function TokenModal({
                 <ActivityIndicator size="small" color="#6B4EFF" style={{ marginVertical: 12 }} />
               ) : (
                 <>
-                  <Text style={styles.tokenCount}>{displayTokens}</Text>
+                  <Text style={styles.tokenCount}>{freeTokens}</Text>
                   <Text style={styles.tokenMax}>/ {WEEKLY_FREE_TOKENS} free</Text>
                 </>
               )}
@@ -150,7 +180,7 @@ export default function TokenModal({
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${tokenPct}%` as any, backgroundColor: progressColour },
+                  { width: `${freeTokenPct}%` as any, backgroundColor: progressColour },
                 ]}
               />
             </View>
@@ -159,6 +189,24 @@ export default function TokenModal({
               <Feather name="refresh-cw" size={11} color="#aaa" />
               <Text style={styles.resetText}>Resets in {nextReset}</Text>
             </View>
+
+            {/* Bonus tokens section */}
+            {bonusTokens > 0 && (
+              <View style={styles.bonusRow}>
+                <View style={styles.bonusBadge}>
+                  <Feather name="zap" size={12} color="#6B4EFF" />
+                  <Text style={styles.bonusText}>+{bonusTokens} bonus tokens</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Payment pending indicator */}
+            {paymentPending && (
+              <View style={styles.pendingRow}>
+                <ActivityIndicator size="small" color="#6B4EFF" />
+                <Text style={styles.pendingText}>Waiting for payment confirmation...</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -169,7 +217,7 @@ export default function TokenModal({
           <TouchableOpacity
             style={styles.topUpOption}
             onPress={() => handleTopUp("basic")}
-            disabled={loading}
+            disabled={loading || paymentPending}
           >
             <View style={styles.topUpLeft}>
               <View style={[styles.topUpIconWrap, { backgroundColor: "#F4A26120" }]}>
@@ -188,7 +236,7 @@ export default function TokenModal({
           <TouchableOpacity
             style={[styles.topUpOption, styles.topUpOptionHighlight]}
             onPress={() => handleTopUp("pro")}
-            disabled={loading}
+            disabled={loading || paymentPending}
           >
             <View style={styles.topUpLeft}>
               <View style={[styles.topUpIconWrap, { backgroundColor: "#6B4EFF20" }]}>
@@ -223,29 +271,34 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15, shadowRadius: 24, elevation: 10,
   },
-  header:      { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
+  header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
   avatarCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: "#F0EFED", justifyContent: "center", alignItems: "center" },
-  headerText:  { flex: 1 },
-  username:    { fontSize: 16, fontWeight: "700", color: "#1a1a1a" },
-  email:       { fontSize: 13, color: "#999", marginTop: 2 },
-  closeBtn:    { width: 32, height: 32, borderRadius: 16, backgroundColor: "#F0EFED", justifyContent: "center", alignItems: "center" },
-  divider:     { height: 1, backgroundColor: "rgba(0,0,0,0.06)", marginVertical: 16 },
+  headerText: { flex: 1 },
+  username: { fontSize: 16, fontWeight: "700", color: "#1a1a1a" },
+  email: { fontSize: 13, color: "#999", marginTop: 2 },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#F0EFED", justifyContent: "center", alignItems: "center" },
+  divider: { height: 1, backgroundColor: "rgba(0,0,0,0.06)", marginVertical: 16 },
   tokenSection: { alignItems: "center", paddingVertical: 4 },
-  tokenLabel:  { fontSize: 11, fontWeight: "700", color: "#aaa", letterSpacing: 1.2, textTransform: "uppercase" },
+  tokenLabel: { fontSize: 11, fontWeight: "700", color: "#aaa", letterSpacing: 1.2, textTransform: "uppercase" },
   tokenCountRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, marginTop: 8, marginBottom: 14 },
-  tokenCount:  { fontSize: 52, fontWeight: "800", color: "#1a1a1a", lineHeight: 56 },
-  tokenMax:    { fontSize: 14, color: "#aaa", fontWeight: "600", marginBottom: 10 },
+  tokenCount: { fontSize: 52, fontWeight: "800", color: "#1a1a1a", lineHeight: 56 },
+  tokenMax: { fontSize: 14, color: "#aaa", fontWeight: "600", marginBottom: 10 },
   progressBar: { width: "100%", height: 8, backgroundColor: "#EBEBEB", borderRadius: 4, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 4 },
-  resetRow:    { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 10 },
-  resetText:   { fontSize: 12, color: "#aaa", fontWeight: "500" },
-  topUpTitle:  { fontSize: 16, fontWeight: "800", color: "#1a1a1a", marginBottom: 12 },
+  resetRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 10 },
+  resetText: { fontSize: 12, color: "#aaa", fontWeight: "500" },
+  bonusRow: { marginTop: 12 },
+  bonusBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F0EEFF", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  bonusText: { fontSize: 13, fontWeight: "700", color: "#6B4EFF" },
+  pendingRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  pendingText: { fontSize: 12, color: "#6B4EFF", fontWeight: "500" },
+  topUpTitle: { fontSize: 16, fontWeight: "800", color: "#1a1a1a", marginBottom: 12 },
   topUpOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F5F3F0", borderRadius: 16, padding: 14, marginBottom: 10 },
   topUpOptionHighlight: { backgroundColor: "#F0EEFF", borderWidth: 1.5, borderColor: "#6B4EFF30" },
-  topUpLeft:   { flexDirection: "row", alignItems: "center", gap: 12 },
+  topUpLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   topUpIconWrap: { width: 38, height: 38, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  topUpLabel:  { fontSize: 15, fontWeight: "700", color: "#1a1a1a" },
-  topUpSub:    { fontSize: 12, color: "#999", marginTop: 2 },
+  topUpLabel: { fontSize: 15, fontWeight: "700", color: "#1a1a1a" },
+  topUpSub: { fontSize: 12, color: "#999", marginTop: 2 },
   topUpPriceWrap: { backgroundColor: "#1a1a1a", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
-  topUpPrice:  { color: "white", fontWeight: "700", fontSize: 14 },
+  topUpPrice: { color: "white", fontWeight: "700", fontSize: 14 },
 });
