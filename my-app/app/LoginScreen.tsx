@@ -13,23 +13,19 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../AuthContext';
-
-const FIREBASE_API_KEY = 'AIzaSyBO2fmkGoxJxL4r_z_Bvqw31hpNWC0hF0o';
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+} from 'firebase/auth';
+import { firebaseAuth } from '../AuthContext';
 
 export default function LoginScreen() {
-  const { setUser } = useAuth();
-  const [email, setEmail]             = useState('');
-  const [password, setPassword]       = useState('');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError]             = useState('');
-  const [loading, setLoading]         = useState(false);
-  const [unverified, setUnverified]   = useState(false);
-  const [resending, setResending]     = useState(false);
-  const [resentOk, setResentOk]       = useState(false);
-
-  // Stored after successful login but before verification check
-  const [pendingToken, setPendingToken] = useState('');
+  const [error, setError]               = useState('');
+  const [loading, setLoading]           = useState(false);
+  const [unverified, setUnverified]     = useState(false);
 
   const handleForgotPassword = async () => {
     if (!email) {
@@ -37,15 +33,7 @@ export default function LoginScreen() {
       return;
     }
     try {
-      await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestType: 'PASSWORD_RESET', email }),
-        }
-      );
-      setError('');
+      await sendPasswordResetEmail(firebaseAuth, email);
       alert('Password reset email sent! Check your inbox.');
     } catch {
       setError('Failed to send reset email. Try again.');
@@ -62,87 +50,29 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      // 1. Sign in
-      const res  = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, returnSecureToken: true }),
-        }
-      );
-      const data = await res.json();
+      const result = await signInWithEmailAndPassword(firebaseAuth, email, password);
 
-      if (data.error) {
-        const code = data.error.message;
-        if (code === 'EMAIL_NOT_FOUND' || code === 'INVALID_PASSWORD' || code === 'INVALID_LOGIN_CREDENTIALS') {
-          setError('Incorrect email or password');
-        } else if (code === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
-          setError('Too many attempts. Try again later');
-        } else if (code === 'USER_DISABLED') {
-          setError('This account has been disabled');
-        } else {
-          setError('Something went wrong. Please try again');
-        }
-        return;
-      }
-
-      const idToken = data.idToken;
-
-      // 2. Check if email is verified
-      const lookupRes  = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ idToken }),
-        }
-      );
-      const lookupData = await lookupRes.json();
-      const userInfo   = lookupData?.users?.[0];
-
-      if (!userInfo?.emailVerified) {
-        // Block login — show resend option
-        setPendingToken(idToken);
+      if (!result.user.emailVerified) {
+        await firebaseAuth.signOut();
         setUnverified(true);
         return;
       }
 
-      // 3. Verified — store user and let them in
-      setUser({
-        uid: userInfo.localId,
-        email: userInfo.email,
-        displayName: userInfo.displayName ?? null,
-        idToken,
-      });
       router.replace('/(tabs)/HomeScreen');
 
-    } catch (err) {
-      setError('Network error. Check your connection');
+    } catch (err: any) {
+      const code = err.code;
+      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setError('Incorrect email or password');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many attempts. Try again later');
+      } else if (code === 'auth/user-disabled') {
+        setError('This account has been disabled');
+      } else {
+        setError('Something went wrong. Please try again');
+      }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const resendVerification = async () => {
-    if (!pendingToken) return;
-    setResending(true);
-    setResentOk(false);
-    try {
-      await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestType: 'VERIFY_EMAIL', idToken: pendingToken }),
-        }
-      );
-      setResentOk(true);
-      setTimeout(() => setResentOk(false), 4000);
-    } catch {
-      setError('Failed to resend. Please try again.');
-    } finally {
-      setResending(false);
     }
   };
 
@@ -199,7 +129,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Standard error */}
           {error ? (
             <View style={styles.errorWrapper}>
               <Ionicons name="alert-circle-outline" size={14} color="#FF3B30" />
@@ -207,7 +136,6 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {/* Unverified email banner */}
           {unverified && (
             <View style={styles.unverifiedCard}>
               <Ionicons name="mail-unread-outline" size={20} color="#E65100" />
@@ -215,19 +143,6 @@ export default function LoginScreen() {
                 <Text style={styles.unverifiedTitle}>Email not verified</Text>
                 <Text style={styles.unverifiedSub}>Check your inbox and click the link before logging in.</Text>
               </View>
-              <TouchableOpacity onPress={resendVerification} disabled={resending}>
-                {resending
-                  ? <ActivityIndicator size="small" color="#E65100" />
-                  : <Text style={styles.resendText}>Resend</Text>
-                }
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {resentOk && (
-            <View style={styles.successWrapper}>
-              <Ionicons name="checkmark-circle-outline" size={14} color="#2E7D32" />
-              <Text style={styles.successText}>Verification email sent!</Text>
             </View>
           )}
 
@@ -273,9 +188,6 @@ const styles = StyleSheet.create({
   unverifiedCard:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#FFF3E0', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#FFE0B2' },
   unverifiedTitle:  { fontSize: 13, fontWeight: '700', color: '#E65100', marginBottom: 2 },
   unverifiedSub:    { fontSize: 12, color: '#BF360C', lineHeight: 17 },
-  resendText:       { fontSize: 13, fontWeight: '700', color: '#E65100' },
-  successWrapper:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  successText:      { color: '#2E7D32', fontSize: 13, fontWeight: '600' },
   forgotWrapper:    { alignSelf: 'flex-end' },
   forgotText:       { fontSize: 13, color: '#6B4EFF', fontWeight: '600' },
   button:           { backgroundColor: '#1A1A1A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
