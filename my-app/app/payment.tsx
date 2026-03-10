@@ -46,7 +46,9 @@ export default function TokenModal({
   const [tokens, setTokens] = useState<number | null>(null);
   const [nextReset, setNextReset] = useState("...");
   const [loading, setLoading] = useState(false);
-  const [paymentPending, setPaymentPending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [showRefreshBtn, setShowRefreshBtn] = useState(false);
+  const [lastSessionId, setLastSessionId] = useState<string | null>(null);
 
   const fetchBalance = async () => {
     try {
@@ -68,41 +70,14 @@ export default function TokenModal({
     if (visible) fetchBalance();
   }, [visible]);
 
-  // Poll for token update after payment
-  const pollForTokenUpdate = async (previousTokens: number) => {
-    setPaymentPending(true);
-    let attempts = 0;
-    const maxAttempts = 12; // poll for 60 seconds
-
-    const poll = async () => {
-      attempts++;
-      const newTokens = await fetchBalance();
-      if (newTokens && newTokens > previousTokens) {
-        // Tokens updated!
-        setPaymentPending(false);
-        crossAlert("✅ Payment Successful!", `${newTokens - previousTokens} tokens have been added to your account.`);
-        return;
-      }
-      if (attempts < maxAttempts) {
-        setTimeout(poll, 5000); // check every 5 seconds
-      } else {
-        setPaymentPending(false);
-        crossAlert("Payment received", "Your tokens will appear shortly. Please refresh if they don't show up in a minute.");
-      }
-    };
-
-    setTimeout(poll, 3000); // start polling after 3 seconds
-  };
-
   const handleTopUp = async (plan: "basic" | "pro") => {
     const pretty = plan === "basic" ? "5 tokens for £1.99" : "10 tokens for £2.99";
 
     crossConfirm("Top Up Tokens", `Purchase ${pretty}?`, async () => {
       setLoading(true);
-      const previousTokens = tokens ?? 0;
       try {
         const token = await getToken();
-        const uid = user?.uid ?? 'test-user-123';
+        const uid = user?.uid ?? "test-user-123";
 
         const res = await fetch(`${API_URL}/payments/create-checkout-session-plan`, {
           method: "POST",
@@ -116,14 +91,15 @@ export default function TokenModal({
         const data = await res.json();
         if (!res.ok) throw new Error(data?.detail || "Failed to create checkout session");
 
+        setLastSessionId(data.id);
+
         if (Platform.OS === "web") {
           window.open(data.url, "_blank");
         } else {
           await WebBrowser.openBrowserAsync(data.url);
         }
 
-        // Start polling for token update
-        pollForTokenUpdate(previousTokens);
+        setShowRefreshBtn(true);
 
       } catch (e: any) {
         crossAlert("Payment error", e.message);
@@ -133,7 +109,43 @@ export default function TokenModal({
     });
   };
 
-  // Split tokens into free and bonus
+  const handleVerifyPayment = async () => {
+    if (!lastSessionId) return;
+    setVerifying(true);
+    try {
+      const token = await getToken();
+      const uid = user?.uid ?? "test-user-123";
+
+      const res = await fetch(`${API_URL}/payments/verify-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ session_id: lastSessionId, uid }),
+      });
+
+      const data = await res.json();
+
+      if (data.credited) {
+        await fetchBalance();
+        setShowRefreshBtn(false);
+        setLastSessionId(null);
+        crossAlert("✅ Tokens added!", `+${data.amount} tokens have been added to your account.`);
+      } else if (data.already_credited) {
+        await fetchBalance();
+        setShowRefreshBtn(false);
+        crossAlert("Already credited", "These tokens were already added to your account.");
+      } else {
+        crossAlert("Payment not found", "We couldn't find a completed payment yet. Please wait a moment and try again.");
+      }
+    } catch (e: any) {
+      crossAlert("Error", "Failed to verify payment. Please try again.");
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const totalTokens = tokens ?? 0;
   const freeTokens = Math.min(totalTokens, WEEKLY_FREE_TOKENS);
   const bonusTokens = Math.max(0, totalTokens - WEEKLY_FREE_TOKENS);
@@ -151,8 +163,8 @@ export default function TokenModal({
               <Ionicons name="person-outline" size={22} color="#555" />
             </View>
             <View style={styles.headerText}>
-              <Text style={styles.username}>{user?.displayName || user?.email?.split('@')[0] || 'User'}</Text>
-              <Text style={styles.email}>{user?.email || 'Not signed in'}</Text>
+              <Text style={styles.username}>{user?.displayName || user?.email?.split("@")[0] || "User"}</Text>
+              <Text style={styles.email}>{user?.email || "Not signed in"}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Feather name="x" size={18} color="#888" />
@@ -177,12 +189,7 @@ export default function TokenModal({
             </View>
 
             <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${freeTokenPct}%` as any, backgroundColor: progressColour },
-                ]}
-              />
+              <View style={[styles.progressFill, { width: `${freeTokenPct}%` as any, backgroundColor: progressColour }]} />
             </View>
 
             <View style={styles.resetRow}>
@@ -190,7 +197,6 @@ export default function TokenModal({
               <Text style={styles.resetText}>Resets in {nextReset}</Text>
             </View>
 
-            {/* Bonus tokens section */}
             {bonusTokens > 0 && (
               <View style={styles.bonusRow}>
                 <View style={styles.bonusBadge}>
@@ -199,26 +205,28 @@ export default function TokenModal({
                 </View>
               </View>
             )}
-
-            {/* Payment pending indicator */}
-            {paymentPending && (
-              <View style={styles.pendingRow}>
-                <ActivityIndicator size="small" color="#6B4EFF" />
-                <Text style={styles.pendingText}>Waiting for payment confirmation...</Text>
-              </View>
-            )}
           </View>
+
+          {/* Verify payment button */}
+          {showRefreshBtn && (
+            <TouchableOpacity style={styles.verifyBtn} onPress={handleVerifyPayment} disabled={verifying}>
+              {verifying ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <Feather name="check-circle" size={16} color="white" />
+                  <Text style={styles.verifyBtnText}>I've paid — add my tokens</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           <View style={styles.divider} />
 
           {/* Top Up Options */}
           <Text style={styles.topUpTitle}>Top Up</Text>
 
-          <TouchableOpacity
-            style={styles.topUpOption}
-            onPress={() => handleTopUp("basic")}
-            disabled={loading || paymentPending}
-          >
+          <TouchableOpacity style={styles.topUpOption} onPress={() => handleTopUp("basic")} disabled={loading || verifying}>
             <View style={styles.topUpLeft}>
               <View style={[styles.topUpIconWrap, { backgroundColor: "#F4A26120" }]}>
                 <Feather name="zap" size={16} color="#F4A261" />
@@ -233,11 +241,7 @@ export default function TokenModal({
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.topUpOption, styles.topUpOptionHighlight]}
-            onPress={() => handleTopUp("pro")}
-            disabled={loading || paymentPending}
-          >
+          <TouchableOpacity style={[styles.topUpOption, styles.topUpOptionHighlight]} onPress={() => handleTopUp("pro")} disabled={loading || verifying}>
             <View style={styles.topUpLeft}>
               <View style={[styles.topUpIconWrap, { backgroundColor: "#6B4EFF20" }]}>
                 <Feather name="zap" size={16} color="#6B4EFF" />
@@ -248,10 +252,7 @@ export default function TokenModal({
               </View>
             </View>
             <View style={[styles.topUpPriceWrap, { backgroundColor: "#6B4EFF" }]}>
-              {loading
-                ? <ActivityIndicator size="small" color="white" />
-                : <Text style={[styles.topUpPrice, { color: "white" }]}>£2.99</Text>
-              }
+              {loading ? <ActivityIndicator size="small" color="white" /> : <Text style={[styles.topUpPrice, { color: "white" }]}>£2.99</Text>}
             </View>
           </TouchableOpacity>
 
@@ -262,15 +263,8 @@ export default function TokenModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-start", paddingTop: 70, paddingHorizontal: 16,
-  },
-  sheet: {
-    backgroundColor: "#FAFAFA", borderRadius: 24, padding: 20,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15, shadowRadius: 24, elevation: 10,
-  },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-start", paddingTop: 70, paddingHorizontal: 16 },
+  sheet: { backgroundColor: "#FAFAFA", borderRadius: 24, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 10 },
   header: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
   avatarCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: "#F0EFED", justifyContent: "center", alignItems: "center" },
   headerText: { flex: 1 },
@@ -290,8 +284,8 @@ const styles = StyleSheet.create({
   bonusRow: { marginTop: 12 },
   bonusBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F0EEFF", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   bonusText: { fontSize: 13, fontWeight: "700", color: "#6B4EFF" },
-  pendingRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
-  pendingText: { fontSize: 12, color: "#6B4EFF", fontWeight: "500" },
+  verifyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#22C55E", borderRadius: 16, padding: 14, marginTop: 12 },
+  verifyBtnText: { color: "white", fontWeight: "700", fontSize: 15 },
   topUpTitle: { fontSize: 16, fontWeight: "800", color: "#1a1a1a", marginBottom: 12 },
   topUpOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F5F3F0", borderRadius: 16, padding: 14, marginBottom: 10 },
   topUpOptionHighlight: { backgroundColor: "#F0EEFF", borderWidth: 1.5, borderColor: "#6B4EFF30" },
