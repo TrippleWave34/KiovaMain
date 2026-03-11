@@ -18,7 +18,7 @@ import { useAuth } from '../AuthContext';
 const FIREBASE_API_KEY = 'AIzaSyBZ_WLPCklEj7wWlyUjOFjJqChU6OglTpE';
 
 export default function SettingsScreen() {
-  const { user, setUser, getToken } = useAuth();
+  const { user, signOut, getToken } = useAuth();
 
   const [showAccount, setShowAccount]         = useState(false);
   const [showAbout, setShowAbout]             = useState(false);
@@ -62,10 +62,10 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    router.replace('/WelcomePage');
-  };
+  const handleLogout = async () => {
+  await signOut();
+  router.replace('/WelcomePage');
+};
 
   const RowItem = ({ icon, label, sublabel, onPress, iconColor = "#F4A261" }: any) => (
     <TouchableOpacity style={styles.row} onPress={onPress}>
