@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+mport React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -300,7 +300,8 @@ export default function WardrobeScreen() {
 
       {/* URL Input Modal */}
       <Modal transparent visible={showUrlInput} animationType="slide" onRequestClose={() => setShowUrlInput(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowUrlInput(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShowUrlInput(false)} />
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Paste product URL</Text>
             <Text style={styles.urlHint}>
@@ -329,7 +330,7 @@ export default function WardrobeScreen() {
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Confirm Save Modal */}
@@ -434,13 +435,6 @@ export default function WardrobeScreen() {
               </Text>
             </TouchableOpacity>
 
-            {!isWardrobe && (
-              <TouchableOpacity style={styles.outlineButton} onPress={() => setShowUrlInput(true)}>
-                <Feather name="link" size={15} color="#1a1a1a" />
-                <Text style={styles.outlineButtonText}>From URL</Text>
-              </TouchableOpacity>
-            )}
-
             <TouchableOpacity style={styles.blackButton} onPress={handleAddItem} disabled={uploading}>
               {uploading
                 ? <ActivityIndicator size="small" color="white" />
@@ -458,6 +452,14 @@ export default function WardrobeScreen() {
             ? "All your clothing pieces, organised in one place."
             : "Pieces you saved from other clothing stores, use them to test outfits before you buy."}
         </Text>
+
+        {!isWardrobe && (
+          <TouchableOpacity style={styles.fromUrlBtn} onPress={() => setShowUrlInput(true)}>
+            <Feather name="link" size={15} color="#6B4EFF" />
+            <Text style={styles.fromUrlBtnText}>Save from URL — paste a link from any online store</Text>
+            <Feather name="chevron-right" size={15} color="#6B4EFF" />
+          </TouchableOpacity>
+        )}
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterRow}>
           {CATEGORIES.map((cat) => (
@@ -596,4 +598,6 @@ const styles = StyleSheet.create({
   detailNoTags:            { fontSize: 14, color: "#aaa", marginBottom: 28 },
   detailDeleteBtn:         { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 50, backgroundColor: "#FFE5E5" },
   detailDeleteText:        { fontSize: 14, fontWeight: "700", color: "#FF3B30" },
+  fromUrlBtn:              { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#F0EDFF", borderRadius: 14, padding: 14, marginTop: 14, borderWidth: 1, borderColor: "#D4C8F0" },
+  fromUrlBtnText:          { flex: 1, fontSize: 13, color: "#6B4EFF", fontWeight: "600" },
 });
