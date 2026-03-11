@@ -17,7 +17,7 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { firebaseAuth } from '../AuthContext';
+import { firebaseAuth } from './AuthContext';
 
 export default function LoginScreen() {
   const [email, setEmail]               = useState('');
