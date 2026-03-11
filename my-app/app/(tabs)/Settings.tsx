@@ -13,7 +13,7 @@ import {
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from 'expo-router';
 import TokenModal from '../payment';
-import { useAuth } from '../../AuthContext';
+import { useAuth } from '../AuthContext';
 
 const FIREBASE_API_KEY = 'AIzaSyBZ_WLPCklEj7wWlyUjOFjJqChU6OglTpE';
 
