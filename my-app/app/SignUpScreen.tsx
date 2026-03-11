@@ -17,7 +17,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
 } from 'firebase/auth';
-import { firebaseAuth } from '../AuthContext';
+import { firebaseAuth } from './AuthContext';
 
 export default function SignUpScreen() {
   const [email, setEmail]                     = useState('');
