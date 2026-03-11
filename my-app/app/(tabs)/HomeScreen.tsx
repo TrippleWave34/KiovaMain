@@ -23,7 +23,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import TokenModal from '../payment';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../../AuthContext';
+import { useAuth } from '../AuthContext';
 
 const BACKEND_URL = "https://kiovamain.onrender.com";
 
