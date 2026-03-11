@@ -15,7 +15,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import TokenModal from "../payment";
-import { useAuth } from "../../AuthContext";
+import { useAuth } from '../AuthContext';
 
 const { width, height } = Dimensions.get("window");
 
