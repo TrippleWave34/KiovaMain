@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   Modal,
+  TextInput,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -32,7 +33,6 @@ const CATEGORIES = [
   { id: "8", label: "Accessories" },
 ];
 
-// Tag colour palette — cycles through these
 const TAG_COLORS = [
   { bg: "#F0EDFF", text: "#6B4EFF" },
   { bg: "#FFE9F3", text: "#D63384" },
@@ -61,6 +61,13 @@ export default function WardrobeScreen() {
   // Detail modal
   const [detailItem, setDetailItem]             = useState<ClothingItem | null>(null);
   const [showDetail, setShowDetail]             = useState(false);
+
+  // URL share feature
+  const [showUrlInput, setShowUrlInput]         = useState(false);
+  const [pastedUrl, setPastedUrl]               = useState('');
+  const [fetchingUrl, setFetchingUrl]           = useState(false);
+  const [confirmItem, setConfirmItem]           = useState<ClothingItem | null>(null);
+  const [showConfirm, setShowConfirm]           = useState(false);
 
   // Hidden file input for web
   const fileInputRef = useRef<any>(null);
@@ -166,6 +173,41 @@ export default function WardrobeScreen() {
     }
   };
 
+  // ── Save from URL ────────────────────────────────────────────────────────────
+  const handleSaveFromUrl = async () => {
+    if (!pastedUrl.trim()) return;
+    setFetchingUrl(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/save-from-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ image_url: pastedUrl.trim() }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setConfirmItem({ id: data.id, image_url: data.image_url, tags: data.tags ?? [] });
+      setShowUrlInput(false);
+      setPastedUrl('');
+      setShowConfirm(true);
+    } catch (e: any) {
+      Alert.alert('Could not fetch item', e.message ?? 'Check the URL and try again.');
+    } finally {
+      setFetchingUrl(false);
+    }
+  };
+
+  const confirmSaveItem = () => {
+    if (!confirmItem) return;
+    setSavedItems((prev) => [confirmItem, ...prev]);
+    setShowConfirm(false);
+    setConfirmItem(null);
+  };
+
+  // ── Delete ───────────────────────────────────────────────────────────────────
   const removeItem = async (id: string) => {
     const isWardrobeItem = wardrobeItems.some((i) => i.id === id);
     const endpoint = isWardrobeItem ? `/delete-image/${id}` : `/delete-favourite/${id}`;
@@ -176,14 +218,13 @@ export default function WardrobeScreen() {
       setSavedItems((prev) => prev.filter((i) => i.id !== id));
     }
 
-    // Close detail modal if the deleted item was open
     if (detailItem?.id === id) setShowDetail(false);
 
     try {
       const token = await getToken();
       await fetch(`${API_BASE}${endpoint}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${await getToken()}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
     } catch (e) {
       console.error('Delete failed:', e);
@@ -216,7 +257,6 @@ export default function WardrobeScreen() {
           )
         );
 
-  // Derive a display name from the first tag (capitalised) or fallback
   const getItemName = (item: ClothingItem) => {
     if (item.tags.length === 0) return "Clothing Item";
     return item.tags[0].charAt(0).toUpperCase() + item.tags[0].slice(1);
@@ -258,35 +298,88 @@ export default function WardrobeScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* ── Item Detail Modal ───────────────────────────────────────────────── */}
-      <Modal
-        transparent
-        visible={showDetail}
-        animationType="slide"
-        onRequestClose={() => setShowDetail(false)}
-      >
+      {/* URL Input Modal */}
+      <Modal transparent visible={showUrlInput} animationType="slide" onRequestClose={() => setShowUrlInput(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowUrlInput(false)}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Paste product URL</Text>
+            <Text style={styles.urlHint}>
+              Copy the image link from any online store (ASOS, Zara, H&M etc.) and paste it below.
+            </Text>
+            <TextInput
+              style={styles.urlInput}
+              placeholder="https://www.asos.com/..."
+              placeholderTextColor="#bbb"
+              value={pastedUrl}
+              onChangeText={setPastedUrl}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              style={[styles.blackButton, { marginTop: 14, alignSelf: 'stretch', justifyContent: 'center' }]}
+              onPress={handleSaveFromUrl}
+              disabled={fetchingUrl}
+            >
+              {fetchingUrl
+                ? <ActivityIndicator size="small" color="white" />
+                : <Text style={styles.blackButtonText}>Fetch & Preview</Text>
+              }
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.modalCancel} onPress={() => { setShowUrlInput(false); setPastedUrl(''); }}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Confirm Save Modal */}
+      <Modal transparent visible={showConfirm} animationType="slide" onRequestClose={() => setShowConfirm(false)}>
+        <View style={styles.detailOverlay}>
+          <View style={styles.detailSheet}>
+            {confirmItem && (
+              <>
+                <TouchableOpacity style={styles.detailClose} onPress={() => setShowConfirm(false)}>
+                  <Ionicons name="close" size={20} color="#1a1a1a" />
+                </TouchableOpacity>
+                <Text style={styles.detailName}>Save this piece?</Text>
+                <View style={styles.detailImageWrap}>
+                  <Image source={{ uri: confirmItem.image_url }} style={styles.detailImage} resizeMode="contain" />
+                </View>
+                {confirmItem.tags.length > 0 && (
+                  <View style={styles.detailTagsWrap}>
+                    {confirmItem.tags.map((tag, i) => {
+                      const colour = TAG_COLORS[i % TAG_COLORS.length];
+                      return (
+                        <View key={i} style={[styles.detailTag, { backgroundColor: colour.bg }]}>
+                          <Text style={[styles.detailTagText, { color: colour.text }]}>{tag}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                <TouchableOpacity style={[styles.blackButton, { alignSelf: 'stretch', justifyContent: 'center', marginTop: 8 }]} onPress={confirmSaveItem}>
+                  <Ionicons name="bookmark" size={16} color="white" />
+                  <Text style={styles.blackButtonText}>Save to Saved Pieces</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Item Detail Modal */}
+      <Modal transparent visible={showDetail} animationType="slide" onRequestClose={() => setShowDetail(false)}>
         <View style={styles.detailOverlay}>
           <View style={styles.detailSheet}>
             {detailItem && (
               <>
-                {/* Close button */}
                 <TouchableOpacity style={styles.detailClose} onPress={() => setShowDetail(false)}>
                   <Ionicons name="close" size={20} color="#1a1a1a" />
                 </TouchableOpacity>
-
-                {/* Full image */}
                 <View style={styles.detailImageWrap}>
-                  <Image
-                    source={{ uri: detailItem.image_url }}
-                    style={styles.detailImage}
-                    resizeMode="contain"
-                  />
+                  <Image source={{ uri: detailItem.image_url }} style={styles.detailImage} resizeMode="contain" />
                 </View>
-
-                {/* Name */}
                 <Text style={styles.detailName}>{getItemName(detailItem)}</Text>
-
-                {/* Tags */}
                 {detailItem.tags.length > 0 ? (
                   <View style={styles.detailTagsWrap}>
                     {detailItem.tags.map((tag, i) => {
@@ -301,12 +394,7 @@ export default function WardrobeScreen() {
                 ) : (
                   <Text style={styles.detailNoTags}>No tags yet</Text>
                 )}
-
-                {/* Delete button */}
-                <TouchableOpacity
-                  style={styles.detailDeleteBtn}
-                  onPress={() => confirmRemove(detailItem.id)}
-                >
+                <TouchableOpacity style={styles.detailDeleteBtn} onPress={() => confirmRemove(detailItem.id)}>
                   <Ionicons name="trash-outline" size={16} color="#FF3B30" />
                   <Text style={styles.detailDeleteText}>Remove item</Text>
                 </TouchableOpacity>
@@ -322,11 +410,7 @@ export default function WardrobeScreen() {
           <Ionicons name="person-outline" size={20} color="#555" />
         </TouchableOpacity>
         <View style={styles.logoWrapper}>
-          <Image
-            source={require("../../assets/images/logo.png")}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
+          <Image source={require("../../assets/images/logo.png")} style={styles.logoImage} resizeMode="contain" />
         </View>
         <TouchableOpacity style={styles.iconCircle}>
           <Ionicons name="notifications-outline" size={20} color="#555" />
@@ -349,6 +433,13 @@ export default function WardrobeScreen() {
                 {isWardrobe ? "Saved" : "Wardrobe"}
               </Text>
             </TouchableOpacity>
+
+            {!isWardrobe && (
+              <TouchableOpacity style={styles.outlineButton} onPress={() => setShowUrlInput(true)}>
+                <Feather name="link" size={15} color="#1a1a1a" />
+                <Text style={styles.outlineButtonText}>From URL</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity style={styles.blackButton} onPress={handleAddItem} disabled={uploading}>
               {uploading
@@ -386,6 +477,13 @@ export default function WardrobeScreen() {
           <View style={styles.uploadingBanner}>
             <ActivityIndicator size="small" color="#1a1a1a" />
             <Text style={styles.uploadingText}>Removing background, cropping & tagging your item...</Text>
+          </View>
+        )}
+
+        {fetchingUrl && (
+          <View style={styles.uploadingBanner}>
+            <ActivityIndicator size="small" color="#1a1a1a" />
+            <Text style={styles.uploadingText}>Fetching, cropping & tagging your item...</Text>
           </View>
         )}
 
@@ -477,17 +575,15 @@ const styles = StyleSheet.create({
   cardTag:                 { position: "absolute", bottom: 10, left: 10, backgroundColor: "rgba(0,0,0,0.55)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   cardTagText:             { color: "white", fontSize: 11, fontWeight: "600" },
   deleteBtn:               { position: "absolute", top: 8, right: 8, width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
-
-  // Picker modal
   modalOverlay:            { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
   modalSheet:              { backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
-  modalTitle:              { fontSize: 16, fontWeight: "700", color: "#1a1a1a", marginBottom: 20, textAlign: "center" },
+  modalTitle:              { fontSize: 16, fontWeight: "700", color: "#1a1a1a", marginBottom: 12, textAlign: "center" },
   modalOption:             { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
   modalOptionText:         { fontSize: 16, color: "#1a1a1a", fontWeight: "500" },
   modalCancel:             { marginTop: 16, alignItems: "center", paddingVertical: 14 },
   modalCancelText:         { fontSize: 16, color: "#999", fontWeight: "600" },
-
-  // Detail modal
+  urlHint:                 { color: "#888", fontSize: 13, marginBottom: 14, textAlign: "center", lineHeight: 19 },
+  urlInput:                { backgroundColor: "#F0EFED", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: "#1a1a1a", borderWidth: 1, borderColor: "#E0DDD8" },
   detailOverlay:           { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   detailSheet:             { backgroundColor: "#F5F3F0", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, paddingBottom: 48, minHeight: height * 0.75 },
   detailClose:             { alignSelf: "flex-end", width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.07)", alignItems: "center", justifyContent: "center", marginBottom: 16 },
