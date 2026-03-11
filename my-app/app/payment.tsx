@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import { useAuth } from "../app/AuthContext";
+import { useAuth } from '../AuthContext';
 
 function crossConfirm(title: string, message: string, onConfirm: () => void) {
   if (Platform.OS === "web") {
