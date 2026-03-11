@@ -1,6 +1,7 @@
-mport { useEffect } from "react";
+import { useEffect } from "react";
 import { Stack, router, useSegments } from "expo-router";
-import { AuthProvider, useAuth } from '../AuthContext';
+import { AuthProvider, useAuth } from './AuthContext';
+
 
 function RootLayoutNav() {
   const { user, loading } = useAuth();
