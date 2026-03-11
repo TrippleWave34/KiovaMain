@@ -30,8 +30,6 @@ from autotagging import autotag_image
 from GenImg import gen_img, save_image_locally
 from tokens import get_token_balance, deduct_token, credit_tokens
 
-import stripe
-
 # ── Rate limiter ───────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
@@ -52,9 +50,6 @@ if not firebase_admin._apps:
     else:
         cred = credentials.Certificate("kiova-cddb5-firebase-adminsdk-fbsvc-0ae9b336ca.json")
     firebase_admin.initialize_app(cred)
-
-custom_token = auth.create_custom_token("user-uid")
-print("CUSTOM: ", custom_token)
 
 # ── FastAPI ────────────────────────────────────────────────────────────────────
 app = FastAPI()
@@ -80,19 +75,25 @@ Base.metadata.create_all(bind=engine)
 
 FIREBASE_API_KEY = os.getenv("API_KEY")
 
-def sign_in_user(email: str, password: str) -> str:
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={FIREBASE_API_KEY}"
-    resp = requests.post(url, json={"email": email, "password": password, "returnSecureToken": True})
-    resp.raise_for_status()
-    return resp.json()["idToken"]
+# ── PayPal ─────────────────────────────────────────────────────────────────────
+PAYPAL_CLIENT_ID     = os.getenv("PAYPAL_CLIENT_ID")
+PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET")
+PAYPAL_BASE_URL      = "https://api-m.sandbox.paypal.com"  # change to https://api-m.paypal.com for live
+BASE_URL             = "https://kiovamain.onrender.com"
 
-# ── Stripe ─────────────────────────────────────────────────────────────────────
-stripe.api_key        = os.getenv("STRIPE_SECRET_KEY")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
-SUCCESS_URL           = os.getenv("FRONTEND_SUCCESS_URL", "https://kiovamain.onrender.com/payment-success")
-CANCEL_URL            = os.getenv("FRONTEND_CANCEL_URL",  "https://kiovamain.onrender.com/payment-cancel")
-PLAN_TOKENS           = {"basic": 5, "pro": 10}
-PLAN_PRICES_GBP       = {"basic": 199, "pro": 299}
+PLAN_TOKENS    = {"basic": 5, "pro": 10}
+PLAN_PRICES    = {"basic": "1.99", "pro": "2.99"}
+MAX_TOKENS     = 20
+
+def get_paypal_access_token():
+    resp = requests.post(
+        f"{PAYPAL_BASE_URL}/v1/oauth2/token",
+        headers={"Accept": "application/json"},
+        data={"grant_type": "client_credentials"},
+        auth=(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET),
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -105,17 +106,135 @@ def read_root():
 
 
 @app.get("/payment-success", response_class=HTMLResponse)
-async def payment_success():
-    return """
+async def payment_success(token: str = "", PayerID: str = "", uid: str = "", plan: str = ""):
+    # If we have all params, capture the payment and credit tokens
+    tokens_added = 0
+    error_msg = ""
+
+    if token and PayerID and uid and plan:
+        try:
+            access_token = get_paypal_access_token()
+            # Capture the order
+            capture_resp = requests.post(
+                f"{PAYPAL_BASE_URL}/v2/checkout/orders/{token}/capture",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {access_token}",
+                },
+            )
+            capture_data = capture_resp.json()
+            status = capture_data.get("status")
+
+            if status == "COMPLETED":
+                # Check not already processed
+                db = SessionLocal()
+                try:
+                    already = db.query(ProcessedPayment).filter(ProcessedPayment.payment_intent == token).first()
+                    if not already:
+                        amount = PLAN_TOKENS.get(plan, 0)
+                        # Get current tokens and cap at MAX_TOKENS
+                        current = get_token_balance(uid, db)
+                        current_tokens = current.get("tokens", 0)
+                        space = MAX_TOKENS - current_tokens
+                        to_add = min(amount, space)
+                        if to_add > 0:
+                            credit_tokens(uid, to_add, db)
+                        tokens_added = to_add
+                        db.add(ProcessedPayment(payment_intent=token, uid=uid, plan=plan))
+                        db.commit()
+                finally:
+                    db.close()
+        except Exception as e:
+            error_msg = str(e)
+
+    return f"""
+    <!DOCTYPE html>
     <html>
-        <head><title>Payment Successful</title></head>
-        <body style="font-family:sans-serif;text-align:center;padding:50px;background:#f9f9f9;">
-            <div style="max-width:400px;margin:auto;background:white;padding:40px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
-                <h1 style="color:#4CAF50;">✅ Payment Successful!</h1>
-                <p style="color:#555;">Your payment is confirmed.</p>
-                <p style="color:#555;">Close this tab, return to Kiova and tap <strong>"I've paid — add my tokens"</strong> to receive your tokens.</p>
-            </div>
-        </body>
+    <head>
+        <title>Payment Successful — Kiova</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }}
+            .card {{
+                background: white;
+                border-radius: 24px;
+                padding: 48px 40px;
+                text-align: center;
+                max-width: 420px;
+                width: 100%;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            }}
+            .icon {{
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #22c55e, #16a34a);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 24px;
+                font-size: 36px;
+            }}
+            h1 {{ font-size: 28px; font-weight: 800; color: #1a1a1a; margin-bottom: 12px; }}
+            p {{ color: #666; font-size: 16px; line-height: 1.6; margin-bottom: 8px; }}
+            .tokens-badge {{
+                background: linear-gradient(135deg, #667eea, #764ba2);
+                color: white;
+                font-size: 18px;
+                font-weight: 800;
+                padding: 12px 28px;
+                border-radius: 50px;
+                display: inline-block;
+                margin: 20px 0;
+            }}
+            .btn {{
+                display: inline-block;
+                margin-top: 24px;
+                background: #1a1a1a;
+                color: white;
+                padding: 14px 32px;
+                border-radius: 50px;
+                font-weight: 700;
+                font-size: 15px;
+                text-decoration: none;
+                cursor: pointer;
+                border: none;
+            }}
+            .countdown {{ color: #aaa; font-size: 13px; margin-top: 12px; }}
+        </style>
+        <script>
+            let secs = 5;
+            function tick() {{
+                document.getElementById('cd').textContent = secs;
+                if (secs <= 0) window.close();
+                secs--;
+                setTimeout(tick, 1000);
+            }}
+            window.onload = function() {{
+                tick();
+                setTimeout(() => window.close(), 5000);
+            }};
+        </script>
+    </head>
+    <body>
+        <div class="card">
+            <div class="icon">✅</div>
+            <h1>Payment Successful!</h1>
+            {'<div class="tokens-badge">+' + str(tokens_added) + ' tokens added!</div>' if tokens_added > 0 else '<p>Your tokens are being added to your account.</p>'}
+            <p>Head back to Kiova — your tokens are ready to use.</p>
+            <button class="btn" onclick="window.close()">Return to Kiova</button>
+            <p class="countdown">This tab closes in <span id="cd">5</span>s</p>
+        </div>
+    </body>
     </html>
     """
 
@@ -123,15 +242,67 @@ async def payment_success():
 @app.get("/payment-cancel", response_class=HTMLResponse)
 async def payment_cancel():
     return """
+    <!DOCTYPE html>
     <html>
-        <head><title>Payment Cancelled</title></head>
-        <body style="font-family:sans-serif;text-align:center;padding:50px;background:#f9f9f9;">
-            <div style="max-width:400px;margin:auto;background:white;padding:40px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);">
-                <h1 style="color:#f44336;">❌ Payment Cancelled</h1>
-                <p style="color:#555;">Your payment was cancelled. No charges were made.</p>
-                <p style="color:#555;">You can close this page and return to Kiova.</p>
-            </div>
-        </body>
+    <head>
+        <title>Payment Cancelled — Kiova</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+            .card {
+                background: white;
+                border-radius: 24px;
+                padding: 48px 40px;
+                text-align: center;
+                max-width: 420px;
+                width: 100%;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            }
+            .icon {
+                width: 80px;
+                height: 80px;
+                background: linear-gradient(135deg, #f87171, #dc2626);
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 24px;
+                font-size: 36px;
+            }
+            h1 { font-size: 28px; font-weight: 800; color: #1a1a1a; margin-bottom: 12px; }
+            p { color: #666; font-size: 16px; line-height: 1.6; }
+            .btn {
+                display: inline-block;
+                margin-top: 28px;
+                background: #1a1a1a;
+                color: white;
+                padding: 14px 32px;
+                border-radius: 50px;
+                font-weight: 700;
+                font-size: 15px;
+                text-decoration: none;
+                cursor: pointer;
+                border: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="icon">❌</div>
+            <h1>Payment Cancelled</h1>
+            <p>No charges were made. You can close this tab and try again in Kiova.</p>
+            <button class="btn" onclick="window.close()">Close Tab</button>
+        </div>
+    </body>
     </html>
     """
 
@@ -278,116 +449,64 @@ async def generate_outfit(
         return {"message": "Error generating outfit", "p": p, "error": str(e)}
 
 
-class CheckoutRequest(BaseModel):
-    amount: int
-    currency: str = "gbp"
-    description: str = "Kiova Payment"
+# ── PayPal Payment Routes ──────────────────────────────────────────────────────
 
-@app.post("/payments/create-checkout-session")
-async def create_checkout_session(body: CheckoutRequest):
-    if not stripe.api_key:
-        raise HTTPException(status_code=500, detail="Missing STRIPE_SECRET_KEY")
-    try:
-        session = stripe.checkout.Session.create(
-            mode="payment",
-            payment_method_types=["card"],
-            line_items=[{"price_data": {"currency": body.currency, "product_data": {"name": body.description}, "unit_amount": int(body.amount)}, "quantity": 1}],
-            success_url=SUCCESS_URL,
-            cancel_url=CANCEL_URL,
-            metadata={"uid": "test-user"},
-        )
-        return {"id": session.id, "url": session.url}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-class PlanCheckoutRequest(BaseModel):
+class PayPalOrderRequest(BaseModel):
     plan: str
     uid: str
 
-@app.post("/payments/create-checkout-session-plan")
-async def create_checkout_session_plan(body: PlanCheckoutRequest):
-    if not stripe.api_key:
-        raise HTTPException(status_code=500, detail="Missing STRIPE_SECRET_KEY")
+@app.post("/payments/create-paypal-order")
+async def create_paypal_order(body: PayPalOrderRequest):
     plan = body.plan.lower().strip()
-    if plan not in PLAN_PRICES_GBP:
+    if plan not in PLAN_PRICES:
         raise HTTPException(status_code=400, detail="Invalid plan. Use 'basic' or 'pro'.")
+
     try:
-        session = stripe.checkout.Session.create(
-            mode="payment",
-            payment_method_types=["card"],
-            line_items=[{"price_data": {"currency": "gbp", "product_data": {"name": f"Kiova {plan.title()} — {PLAN_TOKENS[plan]} tokens"}, "unit_amount": PLAN_PRICES_GBP[plan]}, "quantity": 1}],
-            success_url=SUCCESS_URL,
-            cancel_url=CANCEL_URL,
-            metadata={"uid": body.uid, "plan": plan},
+        access_token = get_paypal_access_token()
+        order_resp = requests.post(
+            f"{PAYPAL_BASE_URL}/v2/checkout/orders",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {access_token}",
+            },
+            json={
+                "intent": "CAPTURE",
+                "purchase_units": [{
+                    "amount": {
+                        "currency_code": "GBP",
+                        "value": PLAN_PRICES[plan],
+                    },
+                    "description": f"Kiova {plan.title()} — {PLAN_TOKENS[plan]} tokens",
+                }],
+                "application_context": {
+                    "return_url": f"{BASE_URL}/payment-success?uid={body.uid}&plan={plan}",
+                    "cancel_url": f"{BASE_URL}/payment-cancel",
+                    "brand_name": "Kiova",
+                    "user_action": "PAY_NOW",
+                },
+            },
         )
-        return {"id": session.id, "url": session.url, "plan": plan}
+        order_data = order_resp.json()
+        if order_resp.status_code != 201:
+            raise HTTPException(status_code=400, detail=str(order_data))
+
+        # Get the approval URL to redirect user to PayPal
+        approval_url = next(
+            link["href"] for link in order_data["links"] if link["rel"] == "approve"
+        )
+        return {"order_id": order_data["id"], "approval_url": approval_url}
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-class VerifySessionRequest(BaseModel):
-    session_id: str
+class RefreshTokensRequest(BaseModel):
     uid: str
 
-@app.post("/payments/verify-session")
-async def verify_session(body: VerifySessionRequest, db: Session = Depends(get_db)):
-    try:
-        session = stripe.checkout.Session.retrieve(body.session_id)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Could not retrieve session: {str(e)}")
-
-    if session.payment_status != "paid":
-        return {"credited": False, "already_credited": False, "message": "Payment not completed yet"}
-
-    metadata = session.get("metadata", {})
-    session_uid = metadata.get("uid", "")
-    plan = metadata.get("plan", "")
-
-    if session_uid != body.uid:
-        raise HTTPException(status_code=403, detail="Session does not belong to this user")
-
-    if plan not in PLAN_TOKENS:
-        raise HTTPException(status_code=400, detail="Invalid plan in session metadata")
-
-    payment_intent = session.payment_intent
-    already = db.query(ProcessedPayment).filter(ProcessedPayment.payment_intent == payment_intent).first()
-    if already:
-        return {"credited": False, "already_credited": True, "message": "Already credited"}
-
-    amount = PLAN_TOKENS[plan]
-    result = credit_tokens(body.uid, amount, db)
-
-    db.add(ProcessedPayment(payment_intent=payment_intent, uid=body.uid, plan=plan))
-    db.commit()
-
-    print(f"✅ VERIFIED uid={body.uid} plan={plan} +{amount} tokens (balance: {result['tokens']})")
-    return {"credited": True, "already_credited": False, "amount": amount, "tokens": result["tokens"]}
-
-
-@app.post("/stripe/webhook")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
-    if not STRIPE_WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="Missing STRIPE_WEBHOOK_SECRET")
-    payload    = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-    try:
-        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET)
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    if event["type"] == "checkout.session.completed":
-        session  = event["data"]["object"]
-        metadata = session.get("metadata", {})
-        uid      = metadata.get("uid")
-        plan     = metadata.get("plan")
-        if uid and plan and plan in PLAN_TOKENS:
-            amount = PLAN_TOKENS[plan]
-            result = credit_tokens(uid, amount, db)
-            print(f"✅ PAYMENT OK uid={uid} plan={plan} → +{amount} tokens (balance: {result['tokens']})")
-        else:
-            print(f"⚠️ Webhook missing uid/plan: {metadata}")
-
-    return {"received": True}
+@app.post("/payments/refresh-tokens")
+async def refresh_tokens(body: RefreshTokensRequest, db: Session = Depends(get_db)):
+    """Called by frontend after returning from PayPal to get updated token balance."""
+    result = get_token_balance(body.uid, db)
+    return result
