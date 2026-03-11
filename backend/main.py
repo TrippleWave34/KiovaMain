@@ -29,6 +29,7 @@ from savetoimgserver import store_image
 from autotagging import autotag_image
 from GenImg import gen_img, save_image_locally
 from tokens import get_token_balance, deduct_token, credit_tokens
+from fetch_and_process import fetch_and_process_url
 
 # ── Rate limiter ───────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
@@ -78,12 +79,12 @@ FIREBASE_API_KEY = os.getenv("API_KEY")
 # ── PayPal ─────────────────────────────────────────────────────────────────────
 PAYPAL_CLIENT_ID     = os.getenv("PAYPAL_CLIENT_ID")
 PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET")
-PAYPAL_BASE_URL = "https://api-m.paypal.com" # For Live 
+PAYPAL_BASE_URL      = "https://api-m.paypal.com"  # Live
 BASE_URL             = "https://kiovamain.onrender.com"
 
-PLAN_TOKENS    = {"basic": 5, "pro": 10}
-PLAN_PRICES    = {"basic": "1.99", "pro": "2.99"}
-MAX_TOKENS     = 20
+PLAN_TOKENS = {"basic": 5, "pro": 10}
+PLAN_PRICES = {"basic": "1.99", "pro": "2.99"}
+MAX_TOKENS  = 20
 
 def get_paypal_access_token():
     resp = requests.post(
@@ -107,14 +108,12 @@ def read_root():
 
 @app.get("/payment-success", response_class=HTMLResponse)
 async def payment_success(token: str = "", PayerID: str = "", uid: str = "", plan: str = ""):
-    # If we have all params, capture the payment and credit tokens
     tokens_added = 0
     error_msg = ""
 
     if token and PayerID and uid and plan:
         try:
             access_token = get_paypal_access_token()
-            # Capture the order
             capture_resp = requests.post(
                 f"{PAYPAL_BASE_URL}/v2/checkout/orders/{token}/capture",
                 headers={
@@ -126,13 +125,11 @@ async def payment_success(token: str = "", PayerID: str = "", uid: str = "", pla
             status = capture_data.get("status")
 
             if status == "COMPLETED":
-                # Check not already processed
                 db = SessionLocal()
                 try:
                     already = db.query(ProcessedPayment).filter(ProcessedPayment.payment_intent == token).first()
                     if not already:
                         amount = PLAN_TOKENS.get(plan, 0)
-                        # Get current tokens and cap at MAX_TOKENS
                         current = get_token_balance(uid, db)
                         current_tokens = current.get("tokens", 0)
                         space = MAX_TOKENS - current_tokens
@@ -450,6 +447,35 @@ async def generate_outfit(
         return {"message": "Error generating outfit", "p": p, "error": str(e)}
 
 
+# ── Save from URL ──────────────────────────────────────────────────────────────
+
+class SaveFromUrlRequest(BaseModel):
+    image_url: str
+
+@app.post("/save-from-url")
+async def save_from_url(
+    body: SaveFromUrlRequest,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    uid = user["uid"]
+    try:
+        processed_url = await fetch_and_process_url(body.image_url)
+        try:
+            tags = await autotag_image(processed_url)
+        except Exception as tag_err:
+            print(f"Autotagging failed (non-fatal): {tag_err}")
+            tags = []
+        tags_str = ",".join(tags)
+        fav_id = str(uuid.uuid4())
+        db.add(FavouriteImage(id=fav_id, uid=uid, image_url=processed_url, tags=tags_str))
+        db.commit()
+        return {"id": fav_id, "image_url": processed_url, "tags": tags}
+    except Exception as e:
+        print(f"save-from-url error: {str(e)}")
+        return {"message": "Error saving item", "error": str(e)}
+
+
 # ── PayPal Payment Routes ──────────────────────────────────────────────────────
 
 class PayPalOrderRequest(BaseModel):
@@ -491,7 +517,6 @@ async def create_paypal_order(body: PayPalOrderRequest):
         if order_resp.status_code != 201:
             raise HTTPException(status_code=400, detail=str(order_data))
 
-        # Get the approval URL to redirect user to PayPal
         approval_url = next(
             link["href"] for link in order_data["links"] if link["rel"] == "approve"
         )
@@ -508,6 +533,5 @@ class RefreshTokensRequest(BaseModel):
 
 @app.post("/payments/refresh-tokens")
 async def refresh_tokens(body: RefreshTokensRequest, db: Session = Depends(get_db)):
-    """Called by frontend after returning from PayPal to get updated token balance."""
     result = get_token_balance(body.uid, db)
     return result
