@@ -445,8 +445,9 @@ async def generate_outfit(
         p = 2
         return {"message": "Outfit generated", "outfit_url": outfit_url}
     except Exception as e:
-        credit_tokens(uid, 1, db)
-        return {"message": "Error generating outfit", "p": p, "error": str(e)}
+    credit_tokens(uid, 1, db)
+    print(f"OUTFIT ERROR p={p}: {str(e)}")
+    return {"message": "Error generating outfit", "p": p, "error": str(e)}
 
 
 # ── PayPal Payment Routes ──────────────────────────────────────────────────────
