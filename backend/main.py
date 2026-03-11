@@ -78,7 +78,7 @@ FIREBASE_API_KEY = os.getenv("API_KEY")
 # ── PayPal ─────────────────────────────────────────────────────────────────────
 PAYPAL_CLIENT_ID     = os.getenv("PAYPAL_CLIENT_ID")
 PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET")
-PAYPAL_BASE_URL      = "https://api-m.sandbox.paypal.com"  # change to https://api-m.paypal.com for live
+PAYPAL_BASE_URL = "https://api-m.paypal.com" # For Live 
 BASE_URL             = "https://kiovamain.onrender.com"
 
 PLAN_TOKENS    = {"basic": 5, "pro": 10}
