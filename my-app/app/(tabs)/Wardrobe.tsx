@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   TextInput,
+  AppState,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -74,6 +75,44 @@ export default function WardrobeScreen() {
 
   const isWardrobe = view === "wardrobe";
   const items      = isWardrobe ? wardrobeItems : savedItems;
+
+  // ── Handle incoming shared URL from Android share sheet ──────────────────
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const handleSharedUrl = async () => {
+      try {
+        const { getInitialURL } = await import('expo-linking');
+        const url = await getInitialURL();
+        if (url && url.startsWith('http')) {
+          setView('saved');
+          setPastedUrl(url);
+          setShowUrlInput(true);
+        }
+      } catch (e) {
+        console.log('No shared URL on launch');
+      }
+    };
+
+    handleSharedUrl();
+
+    // Also handle when app is already open and URL is shared
+    const subscription = AppState.addEventListener('change', async (state) => {
+      if (state === 'active') {
+        try {
+          const { getInitialURL } = await import('expo-linking');
+          const url = await getInitialURL();
+          if (url && url.startsWith('http')) {
+            setView('saved');
+            setPastedUrl(url);
+            setShowUrlInput(true);
+          }
+        } catch (e) {}
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     fetchWardrobe();
@@ -173,7 +212,7 @@ export default function WardrobeScreen() {
     }
   };
 
-  // ── Save from URL ────────────────────────────────────────────────────────────
+  // ── Save from URL ─────────────────────────────────────────────────────────
   const handleSaveFromUrl = async () => {
     if (!pastedUrl.trim()) return;
     setFetchingUrl(true);
@@ -207,7 +246,7 @@ export default function WardrobeScreen() {
     setConfirmItem(null);
   };
 
-  // ── Delete ───────────────────────────────────────────────────────────────────
+  // ── Delete ────────────────────────────────────────────────────────────────
   const removeItem = async (id: string) => {
     const isWardrobeItem = wardrobeItems.some((i) => i.id === id);
     const endpoint = isWardrobeItem ? `/delete-image/${id}` : `/delete-favourite/${id}`;
@@ -305,11 +344,11 @@ export default function WardrobeScreen() {
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Paste product URL</Text>
             <Text style={styles.urlHint}>
-              Copy the image link from any online store (Depop, Zara, H&M etc.) and paste it below.
+              Copy the link from any online store (Pinterest, Depop, eBay etc.) and paste it below.
             </Text>
             <TextInput
               style={styles.urlInput}
-              placeholder="https://www.depop.com/..."
+              placeholder="https://www.pinterest.com/..."
               placeholderTextColor="#bbb"
               value={pastedUrl}
               onChangeText={setPastedUrl}
