@@ -305,11 +305,11 @@ export default function WardrobeScreen() {
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Paste product URL</Text>
             <Text style={styles.urlHint}>
-              Copy the image link from any online store (ASOS, Zara, H&M etc.) and paste it below.
+              Copy the image link from any online store (Depop, Zara, H&M etc.) and paste it below.
             </Text>
             <TextInput
               style={styles.urlInput}
-              placeholder="https://www.asos.com/..."
+              placeholder="https://www.depop.com/..."
               placeholderTextColor="#bbb"
               value={pastedUrl}
               onChangeText={setPastedUrl}
