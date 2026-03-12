@@ -47,7 +47,7 @@ type ClothingItem = {
 };
 
 export default function HomeScreen() {
-  const { getToken } = useAuth();
+  const { getToken, user } = useAuth();
   const [activeCategory, setActiveCategory]         = useState('1');
   const [showTokens, setShowTokens]                 = useState(false);
   const [wardrobeItems, setWardrobeItems]           = useState<ClothingItem[]>([]);
@@ -193,7 +193,9 @@ export default function HomeScreen() {
   const saveOutfit = async () => {
     if (!generatedOutfitUrl) return;
     try {
-      const key = 'kiova:saved_outfits';
+      const { user } = useAuth();
+// ...
+const key = `kiova:saved_outfits:${user?.uid}`;
       const raw = await AsyncStorage.getItem(key);
       const existing = raw ? JSON.parse(raw) : [];
       const newEntry = {
