@@ -193,9 +193,7 @@ export default function HomeScreen() {
   const saveOutfit = async () => {
     if (!generatedOutfitUrl) return;
     try {
-      const { user } = useAuth();
-// ...
-const key = `kiova:saved_outfits:${user?.uid}`;
+      const key = `kiova:saved_outfits:${user?.uid}`;
       const raw = await AsyncStorage.getItem(key);
       const existing = raw ? JSON.parse(raw) : [];
       const newEntry = {
