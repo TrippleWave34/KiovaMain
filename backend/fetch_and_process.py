@@ -6,11 +6,7 @@ from PIL import Image
 from bs4 import BeautifulSoup
 import os
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-GB,en;q=0.9",
-}
+SCRAPER_API_KEY = "552f01eb4c2c17d74e0355fde9b6d59a"
 
 IMAGE_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -61,44 +57,26 @@ def extract_image_from_html(html: str) -> str:
 
 
 def scrape_product_image(page_url: str) -> str:
-    encoded = requests.utils.quote(page_url, safe="")
-
-    # Proxy 1: allorigins
+    print(f"[scrape] using ScraperAPI for: {page_url}")
     try:
-        print(f"[scrape] trying allorigins...")
-        resp = requests.get(f"https://api.allorigins.win/get?url={encoded}", timeout=20)
-        if resp.status_code == 200:
-            html = resp.json().get("contents", "")
-            if html:
-                result = extract_image_from_html(html)
-                if result:
-                    return result
-    except Exception as e:
-        print(f"[scrape] allorigins failed: {e}")
-
-    # Proxy 2: corsproxy.io
-    try:
-        print(f"[scrape] trying corsproxy.io...")
-        resp = requests.get(f"https://corsproxy.io/?{encoded}", headers=HEADERS, timeout=20)
-        if resp.status_code == 200:
+        resp = requests.get(
+            "http://api.scraperapi.com",
+            params={
+                "api_key": SCRAPER_API_KEY,
+                "url": page_url,
+                "render": "true",
+            },
+            timeout=60,
+        )
+        if resp.status_code == 200 and resp.text:
             result = extract_image_from_html(resp.text)
             if result:
                 return result
+        print(f"[scrape] ScraperAPI returned status {resp.status_code}")
     except Exception as e:
-        print(f"[scrape] corsproxy.io failed: {e}")
+        print(f"[scrape] ScraperAPI failed: {e}")
 
-    # Proxy 3: htmlpreview / thingproxy
-    try:
-        print(f"[scrape] trying thingproxy...")
-        resp = requests.get(f"https://thingproxy.freeboard.io/fetch/{page_url}", headers=HEADERS, timeout=20)
-        if resp.status_code == 200:
-            result = extract_image_from_html(resp.text)
-            if result:
-                return result
-    except Exception as e:
-        print(f"[scrape] thingproxy failed: {e}")
-
-    raise Exception("Could not fetch product image. Please right-click the product image and copy the image address directly.")
+    raise Exception("Could not fetch product image. Try copying the direct image URL instead.")
 
 
 async def fetch_and_process_url(image_url: str) -> str:
@@ -106,7 +84,7 @@ async def fetch_and_process_url(image_url: str) -> str:
     is_direct_image = any(image_url.lower().split("?")[0].endswith(ext) for ext in direct_extensions)
 
     if not is_direct_image:
-        print(f"[fetch_and_process_url] Product page detected, trying proxies...")
+        print(f"[fetch_and_process_url] Product page detected, using ScraperAPI...")
         image_url = scrape_product_image(image_url)
 
     resp = requests.get(image_url, headers=IMAGE_HEADERS, timeout=30)
