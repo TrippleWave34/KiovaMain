@@ -1,5 +1,4 @@
 import io
-import re
 import json
 import base64
 import requests
@@ -14,11 +13,24 @@ HEADERS = {
     "Accept-Language": "en-GB,en;q=0.9",
 }
 
+IMAGE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://www.google.com/",
+}
+
 
 def scrape_product_image(page_url: str) -> str:
-    resp = requests.get(page_url, headers=HEADERS, timeout=30)
+    # Route through allorigins free proxy to bypass bot detection
+    proxy_url = f"https://api.allorigins.win/get?url={requests.utils.quote(page_url)}"
+    print(f"[scrape] fetching via allorigins: {page_url}")
+    resp = requests.get(proxy_url, timeout=45)
     resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, "html.parser")
+    data = resp.json()
+    html = data.get("contents", "")
+    if not html:
+        raise Exception("allorigins returned empty content")
+
+    soup = BeautifulSoup(html, "html.parser")
 
     # Strategy 1: og:image meta tag
     og_image = soup.find("meta", property="og:image")
@@ -45,8 +57,7 @@ def scrape_product_image(page_url: str) -> str:
             continue
 
     # Strategy 3: largest img tag
-    imgs = soup.find_all("img")
-    for img in imgs:
+    for img in soup.find_all("img"):
         src = img.get("src") or img.get("data-src") or ""
         if src.startswith("//"):
             src = "https:" + src
@@ -56,7 +67,7 @@ def scrape_product_image(page_url: str) -> str:
             print(f"[scrape] img tag fallback: {src}")
             return src
 
-    raise Exception("Could not find a product image on this page. Try copying the direct image URL instead.")
+    raise Exception("Could not find a product image on this page.")
 
 
 async def fetch_and_process_url(image_url: str) -> str:
@@ -64,10 +75,10 @@ async def fetch_and_process_url(image_url: str) -> str:
     is_direct_image = any(image_url.lower().split("?")[0].endswith(ext) for ext in direct_extensions)
 
     if not is_direct_image:
-        print(f"[fetch_and_process_url] Product page detected, scraping image...")
+        print(f"[fetch_and_process_url] Product page detected, scraping via proxy...")
         image_url = scrape_product_image(image_url)
 
-    resp = requests.get(image_url, headers=HEADERS, timeout=30)
+    resp = requests.get(image_url, headers=IMAGE_HEADERS, timeout=30)
     resp.raise_for_status()
     img_bytes = resp.content
     print(f"[fetch_and_process_url] fetched {len(img_bytes)} bytes")
